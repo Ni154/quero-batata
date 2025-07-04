@@ -2,16 +2,237 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Quero Batata</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Quero Batata - Cardápio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #f9f9f9; }
+    header {
+      background: #ffcc00;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+    }
+    header h1 { margin: 0; font-size: 24px; }
+    .login {
+      background: #fff;
+      padding: 8px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #000;
+      font-weight: bold;
+    }
+
+    .restaurante-info {
+      background: white;
+      padding: 16px;
+      margin: 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .categorias {
+      display: flex;
+      overflow-x: auto;
+      padding: 0 16px;
+      margin: 0 0 16px;
+    }
+    .categoria {
+      background: #eee;
+      padding: 10px 20px;
+      border-radius: 20px;
+      margin-right: 10px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .categoria.ativa {
+      background: #ff9900;
+      color: white;
+      font-weight: bold;
+    }
+
+    .produtos {
+      padding: 0 16px 32px;
+    }
+
+    .secao h2 {
+      margin-bottom: 12px;
+      color: #333;
+    }
+
+    .card {
+      display: flex;
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .card img {
+      width: 100px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-right: 12px;
+    }
+
+    .card-info { flex: 1; }
+    .card-info h3 { margin: 0 0 8px; }
+    .card-info p { margin: 0 0 8px; font-size: 14px; color: #555; }
+    .card-info .preco { color: green; font-weight: bold; }
+
+    .carrinho {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      background: white;
+      border: 1px solid #ddd;
+      padding: 12px;
+      width: 300px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .carrinho h3 { margin-top: 0; }
+    .carrinho ul { padding-left: 20px; }
+    .carrinho button {
+      background: #ff9900;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 768px) {
+      .carrinho {
+        width: 90%;
+        right: 5%;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Cardápio Quero Batata</h1>
-  <div id="produtos"></div>
-  <div id="carrinho"></div>
-  <button onclick="finalizarPedido()">Finalizar Pedido</button>
+  <header>
+    <h1>Quero Batata</h1>
+    <a class="login" href="/login.html">ENTRAR</a>
+  </header>
 
-  <script src="script.js"></script>
+  <div class="restaurante-info">
+    <h3>🥔 Aberto até 23:59</h3>
+    <p>Entrega: R$ 5,00 • Mínimo: R$ 0,00</p>
+  </div>
+
+  <div class="categorias">
+    <div class="categoria ativa" onclick="mostrarCategoria('bacon')">Bacon</div>
+    <div class="categoria" onclick="mostrarCategoria('camarao')">Camarão</div>
+    <div class="categoria" onclick="mostrarCategoria('carne')">Carne</div>
+    <div class="categoria" onclick="mostrarCategoria('vegana')">Vegana</div>
+  </div>
+
+  <div class="produtos" id="produtos"></div>
+
+  <div class="carrinho">
+    <h3>Carrinho</h3>
+    <div id="carrinho-itens">Seu carrinho está vazio.</div>
+    <strong>Total: R$ <span id="total">0,00</span></strong><br/>
+    <button onclick="finalizarPedido()">Finalizar Pedido</button>
+  </div>
+
+  <script>
+    const produtos = {
+      bacon: [{ nome: "Bacon com brócolis", preco: 36, desc: "Batata com bacon e brócolis.", img: "https://images.unsplash.com/photo-1604908177875-bf49b6d21194" }],
+      camarao: [{ nome: "Camarão cremoso", preco: 42, desc: "Batata com creme de camarão e alho poró.", img: "https://images.unsplash.com/photo-1551183053-bf91a1d81141" }],
+      carne: [{ nome: "Carne com cheddar", preco: 35, desc: "Batata com carne e cheddar.", img: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90" }],
+      vegana: [{ nome: "Batata vegana", preco: 30, desc: "Recheio de legumes ao curry.", img: "https://images.unsplash.com/photo-1601188501466-85c1f35c444b" }]
+    };
+
+    let carrinho = [];
+
+    function mostrarCategoria(cat) {
+      document.querySelectorAll(".categoria").forEach(el => el.classList.remove("ativa"));
+      event.target.classList.add("ativa");
+      const div = document.getElementById("produtos");
+      div.innerHTML = `<div class="secao"><h2>Batatas com ${cat.charAt(0).toUpperCase() + cat.slice(1)}</h2></div>`;
+      produtos[cat].forEach(p => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <img src="${p.img}" alt="${p.nome}" />
+          <div class="card-info">
+            <h3>${p.nome}</h3>
+            <p>${p.desc}</p>
+            <div class="preco">R$ ${p.preco.toFixed(2)}</div>
+            <button onclick="adicionarCarrinho('${p.nome}', ${p.preco})">Adicionar</button>
+          </div>`;
+        div.appendChild(card);
+      });
+    }
+
+    function adicionarCarrinho(nome, preco) {
+      const existente = carrinho.find(item => item.nome === nome);
+      if (existente) { existente.qtd++; }
+      else { carrinho.push({ nome, preco, qtd: 1 }); }
+      atualizarCarrinho();
+    }
+
+    function atualizarCarrinho() {
+      const div = document.getElementById("carrinho-itens");
+      if (carrinho.length === 0) {
+        div.innerHTML = "Seu carrinho está vazio.";
+        document.getElementById("total").innerText = "0,00";
+        return;
+      }
+      let html = "<ul>", total = 0;
+      carrinho.forEach(item => {
+        html += `<li>${item.nome} x ${item.qtd} = R$ ${(item.qtd * item.preco).toFixed(2)}</li>`;
+        total += item.qtd * item.preco;
+      });
+      html += "</ul>";
+      div.innerHTML = html;
+      document.getElementById("total").innerText = total.toFixed(2);
+    }
+
+    function finalizarPedido() {
+      if (carrinho.length === 0) {
+        alert("Adicione itens ao carrinho.");
+        return;
+      }
+
+      const nome = prompt("Seu nome:");
+      const telefone = prompt("Telefone:");
+      const endereco = prompt("Endereço:");
+      const taxa_entrega = 5.00;
+      const total = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0) + taxa_entrega;
+
+      fetch("https://quero-batata.up.railway.app/api/pedido", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          telefone,
+          endereco,
+          produtos: carrinho,
+          taxa_entrega,
+          total
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          alert("Pedido enviado com sucesso!");
+          carrinho = [];
+          atualizarCarrinho();
+          if (data.pdf_url) window.open(data.pdf_url, "_blank");
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Erro ao enviar pedido.");
+        });
+    }
+
+    mostrarCategoria("bacon");
+  </script>
 </body>
 </html>
-
