@@ -129,7 +129,7 @@ if menu == "Produtos":
 if menu == "Pedidos":
     st.header("📋 Pedidos Recentes")
 
-    res = supabase.table("pedidos").select("*").order("data", desc=True).execute()
+    res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
     dados = res.data
 
     if not dados:
