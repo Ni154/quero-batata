@@ -23,17 +23,15 @@ CORS(app)
 def home():
     return "API Quero Batata funcionando!"
 
-# ✅ Rota de login
-USUARIOS = {
-    "admin": "senha123"  # você pode trocar depois ou buscar do Supabase
-}
-
+# ✅ Rota de login com verificação via Supabase
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.json
     usuario = data.get("usuario")
     senha = data.get("senha")
-    if usuario in USUARIOS and USUARIOS[usuario] == senha:
+
+    res = supabase.table("usuarios").select("*").eq("usuario", usuario).eq("senha", senha).execute()
+    if res.data:
         return jsonify({"usuario": usuario, "token": "tokenfake123"})
     return jsonify({"erro": "Usuário ou senha incorretos"}), 401
 
