@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login - Quero Batata</title>
+</head>
+<body>
+  <h1>Login</h1>
+  <form id="loginForm">
+    <label>Usuário: <input type="text" name="usuario" required /></label><br />
+    <label>Senha: <input type="password" name="senha" required /></label><br />
+    <button type="submit">Entrar</button>
+  </form>
+  <div id="msg" style="color:red; margin-top: 1em;"></div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('msg');
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const data = {
+        usuario: form.usuario.value,
+        senha: form.senha.value
+      };
+
+      fetch('https://quero-batata-api.vercel.app/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.erro || 'Erro no login');
+        }
+        return res.json();
+      })
+      .then(response => {
+        msg.style.color = 'green';
+        msg.textContent = 'Login realizado com sucesso! Bem-vindo, ' + response.usuario;
+        // Aqui você pode redirecionar, salvar token etc.
+      })
+      .catch(err => {
+        msg.style.color = 'red';
+        msg.textContent = err.message;
+      });
+    });
+  </script>
+</body>
+</html>
