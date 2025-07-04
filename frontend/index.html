@@ -22,7 +22,6 @@
       color: #000;
       font-weight: bold;
     }
-
     .restaurante-info {
       background: white;
       padding: 16px;
@@ -30,7 +29,6 @@
       border-radius: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
-
     .categorias {
       display: flex;
       overflow-x: auto;
@@ -50,16 +48,13 @@
       color: white;
       font-weight: bold;
     }
-
     .produtos {
       padding: 0 16px 32px;
     }
-
     .secao h2 {
       margin-bottom: 12px;
       color: #333;
     }
-
     .card {
       display: flex;
       background: white;
@@ -68,7 +63,6 @@
       margin-bottom: 12px;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
-
     .card img {
       width: 100px;
       height: 80px;
@@ -76,12 +70,10 @@
       border-radius: 6px;
       margin-right: 12px;
     }
-
     .card-info { flex: 1; }
     .card-info h3 { margin: 0 0 8px; }
     .card-info p { margin: 0 0 8px; font-size: 14px; color: #555; }
     .card-info .preco { color: green; font-weight: bold; }
-
     .carrinho {
       position: fixed;
       right: 16px;
@@ -93,7 +85,6 @@
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
-
     .carrinho h3 { margin-top: 0; }
     .carrinho ul { padding-left: 20px; }
     .carrinho button {
@@ -105,7 +96,6 @@
       cursor: pointer;
       margin-top: 8px;
     }
-
     @media (max-width: 768px) {
       .carrinho {
         width: 90%;
@@ -201,17 +191,40 @@
         return;
       }
 
-      const nome = prompt("Seu nome:");
-      const telefone = prompt("Telefone:");
-      const endereco = prompt("Endereço:");
       const taxa_entrega = 5.00;
-      const total = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0) + taxa_entrega;
+      const subtotal = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0);
+      const total = subtotal + taxa_entrega;
+
+      const formHtml = `
+        <div style="padding:10px;">
+          <h3>Finalizar Pedido</h3>
+          <p><strong>Total com entrega: R$ ${total.toFixed(2)}</strong></p>
+          <label>Nome:<br><input id="nome" style="width:100%" /></label><br><br>
+          <label>Telefone:<br><input id="telefone" style="width:100%" /></label><br><br>
+          <label>Endereço:<br><textarea id="endereco" style="width:100%"></textarea></label><br><br>
+          <button onclick="enviarPedido(${taxa_entrega}, ${total})">Enviar Pedido</button>
+        </div>
+      `;
+
+      const janela = window.open("", "Finalizar Pedido", "width=400,height=500");
+      janela.document.write(`<html><body>${formHtml}</body></html>`);
+    }
+
+    function enviarPedido(taxa_entrega, total) {
+      const nome = document.getElementById("nome").value;
+      const telefone = document.getElementById("telefone").value;
+      const endereco = document.getElementById("endereco").value;
+
+      if (!nome || !telefone || !endereco) {
+        alert("Preencha todos os campos!");
+        return;
+      }
 
       fetch("https://quero-batata.up.railway.app/api/pedido", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nome,
+          nome_cliente: nome,
           telefone,
           endereco,
           produtos: carrinho,
@@ -223,8 +236,8 @@
         .then(data => {
           alert("Pedido enviado com sucesso!");
           carrinho = [];
-          atualizarCarrinho();
-          if (data.pdf_url) window.open(data.pdf_url, "_blank");
+          window.close();
+          location.reload();
         })
         .catch(err => {
           console.error(err);
