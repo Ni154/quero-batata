@@ -5,7 +5,6 @@
   <title>Quero Batata - Cardápio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    /* ...seu CSS mantido aqui, sem alteração... */
     body { font-family: Arial, sans-serif; margin: 0; background: #f9f9f9; }
     header {
       background: #ffcc00;
@@ -24,13 +23,162 @@
       font-weight: bold;
       cursor: pointer;
     }
-    /* resto do CSS igual */
+    .restaurante-info {
+      background: white;
+      padding: 16px;
+      margin: 16px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .categorias {
+      display: flex;
+      overflow-x: auto;
+      padding: 0 16px;
+      margin: 0 0 16px;
+    }
+    .categoria {
+      background: #eee;
+      padding: 10px 20px;
+      border-radius: 20px;
+      margin-right: 10px;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    .categoria.ativa {
+      background: #ff9900;
+      color: white;
+      font-weight: bold;
+    }
+    .produtos {
+      padding: 0 16px 32px;
+    }
+    .secao h2 {
+      margin-bottom: 12px;
+      color: #333;
+    }
+    .card {
+      display: flex;
+      background: white;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      align-items: center;
+    }
+    .card img {
+      width: 100px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-right: 12px;
+      flex-shrink: 0;
+    }
+    .card-info { flex: 1; }
+    .card-info h3 { margin: 0 0 8px; }
+    .card-info p { margin: 0 0 8px; font-size: 14px; color: #555; }
+    .card-info .preco { color: green; font-weight: bold; margin-bottom: 8px; }
+    .card-info button {
+      background: #ff9900;
+      border: none;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s;
+    }
+    .card-info button:hover {
+      background: #e07b00;
+    }
+    .carrinho {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      background: white;
+      border: 1px solid #ddd;
+      padding: 12px;
+      width: 300px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      max-height: 70vh;
+      overflow-y: auto;
+      z-index: 999;
+    }
+    .carrinho h3 { margin-top: 0; }
+    .carrinho ul { padding-left: 20px; margin:0; max-height: 200px; overflow-y: auto; }
+    .carrinho button {
+      background: #ff9900;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 8px;
+      font-weight: bold;
+      width: 100%;
+      transition: background-color 0.3s;
+    }
+    .carrinho button:hover {
+      background: #e07b00;
+    }
+    @media (max-width: 768px) {
+      .carrinho {
+        width: 90%;
+        right: 5%;
+      }
+    }
+    /* Modal para finalizar pedido */
+    #modalPedido {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #modalPedido .modal-conteudo {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-sizing: border-box;
+    }
+    #modalPedido input, #modalPedido textarea {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      padding: 8px;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      resize: vertical;
+    }
+    #modalPedido button {
+      background: #ff9900;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    #modalPedido button:hover {
+      background: #e07b00;
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Quero Batata</h1>
-    <a class="login" id="btnLogin">ENTRAR</a>
+    <a class="login" href="https://quero-batata-production.up.railway.app" target="_blank" rel="noopener noreferrer">ENTRAR</a>
   </header>
 
   <div class="restaurante-info">
@@ -39,10 +187,10 @@
   </div>
 
   <div class="categorias">
-    <div class="categoria ativa" onclick="mostrarCategoria('bacon')">Bacon</div>
-    <div class="categoria" onclick="mostrarCategoria('camarao')">Camarão</div>
-    <div class="categoria" onclick="mostrarCategoria('carne')">Carne</div>
-    <div class="categoria" onclick="mostrarCategoria('vegana')">Vegana</div>
+    <div class="categoria ativa" onclick="mostrarCategoria('bacon', event)">Bacon</div>
+    <div class="categoria" onclick="mostrarCategoria('camarao', event)">Camarão</div>
+    <div class="categoria" onclick="mostrarCategoria('carne', event)">Carne</div>
+    <div class="categoria" onclick="mostrarCategoria('vegana', event)">Vegana</div>
   </div>
 
   <div class="produtos" id="produtos"></div>
@@ -61,19 +209,13 @@
       <p><strong>Total com entrega: R$ <span id="modalTotal">0,00</span></strong></p>
       <label>Nome:<br><input type="text" id="nome" /></label>
       <label>Telefone:<br><input type="text" id="telefone" /></label>
-      <label>Endereço:<br><textarea id="endereco"></textarea></label>
+      <label>Endereço:<br><textarea id="endereco" rows="3"></textarea></label>
       <button onclick="enviarPedido()">Enviar Pedido</button>
     </div>
   </div>
 
   <script>
     const API_BASE_URL = "https://quero-batata-production.up.railway.app";
-    const STREAMLIT_URL = "https://quero-batata-production.up.railway.app"; // ajuste aqui se painel for outra rota
-
-    // Redireciona para painel Streamlit ao clicar em Entrar
-    document.getElementById('btnLogin').addEventListener('click', () => {
-      window.location.href = STREAMLIT_URL;
-    });
 
     const produtos = {
       bacon: [{ nome: "Bacon com brócolis", preco: 36, desc: "Batata com bacon e brócolis.", img: "https://images.unsplash.com/photo-1604908177875-bf49b6d21194" }],
@@ -84,7 +226,7 @@
 
     let carrinho = [];
 
-    function mostrarCategoria(cat) {
+    function mostrarCategoria(cat, event) {
       document.querySelectorAll(".categoria").forEach(el => el.classList.remove("ativa"));
       event.target.classList.add("ativa");
       const div = document.getElementById("produtos");
@@ -177,9 +319,7 @@
         atualizarCarrinho();
         fecharModalPedido();
 
-        // NOTIFICAÇÃO PARA O PAINEL STREAMLIT
-        // Aqui você pode implementar WebSocket, SSE, ou polling para atualizar o painel em tempo real.
-        // Como exemplo simples, vou emitir um evento customizado para possíveis listeners:
+        // Exemplo simples de notificação para painel (precisa integrar backend para real-time)
         const event = new CustomEvent('novoPedido', { detail: data });
         window.dispatchEvent(event);
       })
@@ -189,7 +329,8 @@
       });
     }
 
-    mostrarCategoria("bacon");
+    // Inicializa mostrando categoria bacon
+    mostrarCategoria("bacon", { target: document.querySelector(".categoria.ativa") });
   </script>
 </body>
 </html>
