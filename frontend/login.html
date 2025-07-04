@@ -3,21 +3,70 @@
 <head>
   <meta charset="UTF-8" />
   <title>Login - Quero Batata</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 400px;
+      margin: 60px auto;
+      padding: 20px;
+      border-radius: 8px;
+      background-color: #fff8f0;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #e67e22;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      width: 100%;
+      background-color: #e67e22;
+      color: white;
+      padding: 10px;
+      margin-top: 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #d35400;
+    }
+    #msg {
+      margin-top: 15px;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
   <h1>Login</h1>
   <form id="loginForm">
-    <label>Usuário: <input type="text" name="usuario" required /></label><br />
-    <label>Senha: <input type="password" name="senha" required /></label><br />
+    <label>Usuário:
+      <input type="text" name="usuario" required />
+    </label>
+    <label>Senha:
+      <input type="password" name="senha" required />
+    </label>
     <button type="submit">Entrar</button>
   </form>
-  <div id="msg" style="color:red; margin-top: 1em;"></div>
+  <div id="msg"></div>
 
   <script>
     const form = document.getElementById('loginForm');
     const msg = document.getElementById('msg');
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const data = {
@@ -25,27 +74,27 @@
         senha: form.senha.value
       };
 
-      fetch("https://quero-batata-production.up.railway.app/api/login", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(async res => {
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.erro || 'Erro no login');
+      try {
+        const response = await fetch("https://quero-batata-production.up.railway.app/api/login", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          const erro = await response.json();
+          throw new Error(erro.erro || "Erro no login");
         }
-        return res.json();
-      })
-      .then(response => {
-        msg.style.color = 'green';
-        msg.textContent = 'Login realizado com sucesso! Bem-vindo, ' + response.usuario;
-        // Aqui você pode redirecionar, salvar token etc.
-      })
-      .catch(err => {
-        msg.style.color = 'red';
-        msg.textContent = err.message;
-      });
+
+        const resultado = await response.json();
+
+        // ✅ Redireciona para o painel Streamlit
+        window.location.href = "https://quero-batata.streamlit.app";
+
+      } catch (error) {
+        msg.style.color = "red";
+        msg.textContent = error.message;
+      }
     });
   </script>
 </body>
