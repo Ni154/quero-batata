@@ -5,6 +5,7 @@
   <title>Quero Batata - Cardápio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
+    /* Seu CSS permanece o mesmo */
     body { font-family: Arial, sans-serif; margin: 0; background: #f9f9f9; }
     header {
       background: #ffcc00;
@@ -67,7 +68,6 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
       align-items: center;
     }
-    /* Aqui o ajuste das imagens conforme o seu código original */
     .card img {
       width: 100px;
       height: 80px;
@@ -129,7 +129,6 @@
         right: 5%;
       }
     }
-    /* Modal para finalizar pedido */
     #modalPedido {
       display: none;
       position: fixed;
@@ -179,19 +178,14 @@
   <header>
     <h1>Quero Batata</h1>
     <a class="login" href="https://quero-batata.streamlit.app/" target="_blank" rel="noopener noreferrer">ENTRAR</a>
-    </header>
+  </header>
 
   <div class="restaurante-info">
     <h3>🥔 Aberto até 23:59</h3>
     <p>Entrega: R$ 5,00 • Mínimo: R$ 0,00</p>
   </div>
 
-  <div class="categorias">
-    <div class="categoria ativa" onclick="mostrarCategoria('bacon', event)">Bacon</div>
-    <div class="categoria" onclick="mostrarCategoria('camarao', event)">Camarão</div>
-    <div class="categoria" onclick="mostrarCategoria('carne', event)">Carne</div>
-    <div class="categoria" onclick="mostrarCategoria('vegana', event)">Vegana</div>
-  </div>
+  <div class="categorias" id="categorias"></div>
 
   <div class="produtos" id="produtos"></div>
 
@@ -217,28 +211,69 @@
   <script>
     const API_BASE_URL = "https://quero-batata-production.up.railway.app";
 
-    const produtos = {
-      bacon: [{ nome: "Bacon com brócolis", preco: 36, desc: "Batata com bacon e brócolis.", img: "https://images.unsplash.com/photo-1604908177875-bf49b6d21194" }],
-      camarao: [{ nome: "Camarão cremoso", preco: 42, desc: "Batata com creme de camarão e alho poró.", img: "https://images.unsplash.com/photo-1551183053-bf91a1d81141" }],
-      carne: [{ nome: "Carne com cheddar", preco: 35, desc: "Batata com carne e cheddar.", img: "https://images.unsplash.com/photo-1586190848861-99aa4a171e90" }],
-      vegana: [{ nome: "Batata vegana", preco: 30, desc: "Recheio de legumes ao curry.", img: "https://images.unsplash.com/photo-1601188501466-85c1f35c444b" }]
-    };
-
+    let categorias = [];
+    let produtos = [];
     let carrinho = [];
 
-    function mostrarCategoria(cat, event) {
+    // Carregar categorias da API e montar abas
+    async function carregarCategorias() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/categorias`);
+        categorias = await res.json();
+        const divCategorias = document.getElementById("categorias");
+        divCategorias.innerHTML = "";
+        categorias.forEach((cat, i) => {
+          const div = document.createElement("div");
+          div.className = "categoria" + (i === 0 ? " ativa" : "");
+          div.textContent = cat.nome;
+          div.dataset.id = cat.id;
+          div.onclick = (e) => mostrarCategoria(cat.id, e);
+          divCategorias.appendChild(div);
+        });
+        // Mostrar produtos da primeira categoria por padrão
+        if (categorias.length > 0) {
+          mostrarCategoria(categorias[0].id, { target: divCategorias.children[0] });
+        }
+      } catch (err) {
+        alert("Erro ao carregar categorias");
+        console.error(err);
+      }
+    }
+
+    // Carregar produtos da API
+    async function carregarProdutos() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/produtos`);
+        produtos = await res.json();
+      } catch (err) {
+        alert("Erro ao carregar produtos");
+        console.error(err);
+      }
+    }
+
+    // Mostrar produtos da categoria selecionada
+    function mostrarCategoria(catId, event) {
       document.querySelectorAll(".categoria").forEach(el => el.classList.remove("ativa"));
-      event.target.classList.add("ativa");
+      if(event?.target) event.target.classList.add("ativa");
+
       const div = document.getElementById("produtos");
-      div.innerHTML = `<div class="secao"><h2>Batatas com ${cat.charAt(0).toUpperCase() + cat.slice(1)}</h2></div>`;
-      produtos[cat].forEach(p => {
+      const categoria = categorias.find(c => c.id === catId);
+      div.innerHTML = `<div class="secao"><h2>Batatas com ${categoria ? categoria.nome : ""}</h2></div>`;
+
+      const prodsFiltrados = produtos.filter(p => p.categoria_id === catId);
+      if (prodsFiltrados.length === 0) {
+        div.innerHTML += "<p>Nenhum produto nesta categoria.</p>";
+        return;
+      }
+
+      prodsFiltrados.forEach(p => {
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML = `
-          <img src="${p.img}" alt="${p.nome}" />
+          <img src="${p.imagem_url || 'https://via.placeholder.com/100x80?text=Sem+Imagem'}" alt="${p.nome}" />
           <div class="card-info">
             <h3>${p.nome}</h3>
-            <p>${p.desc}</p>
+            <p>${p.descricao || ''}</p>
             <div class="preco">R$ ${p.preco.toFixed(2)}</div>
             <button onclick="adicionarCarrinho('${p.nome}', ${p.preco})">Adicionar</button>
           </div>`;
@@ -329,8 +364,11 @@
       });
     }
 
-    // Inicializa mostrando categoria bacon
-    mostrarCategoria("bacon", { target: document.querySelector(".categoria.ativa") });
+    // Inicialização
+    (async () => {
+      await carregarCategorias();
+      await carregarProdutos();
+    })();
   </script>
 </body>
 </html>
