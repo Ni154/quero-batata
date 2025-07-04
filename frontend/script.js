@@ -1,59 +1,55 @@
-const apiUrl = "https://SEU_BACKEND_URL/api/pedido";
+const API_BASE_URL = "https://quero-batata-production.up.railway.app";
 
-const produtos = [
-  { nome: "Batata Cheddar Bacon", preco: 25 },
-  { nome: "Batata Calabresa Catupiry", preco: 28 },
-];
+async function carregarCardapio() {
+  const categoriasRes = await fetch(`${API_BASE_URL}/api/categorias`);
+  const categorias = await categoriasRes.json();
 
-let carrinho = [];
+  const produtosRes = await fetch(`${API_BASE_URL}/api/produtos`);
+  const produtos = await produtosRes.json();
 
-function renderProdutos() {
-  const div = document.getElementById("produtos");
-  div.innerHTML = produtos
-    .map((p, i) => `<div>
-        ${p.nome} - R$ ${p.preco.toFixed(2)}
-        <button onclick="adicionar(${i})">Adicionar</button>
-      </div>`)
-    .join("");
+  const divCategorias = document.querySelector('.categorias');
+  const divProdutos = document.getElementById('produtos');
+
+  // Limpar
+  divCategorias.innerHTML = '';
+  divProdutos.innerHTML = '';
+
+  categorias.forEach(cat => {
+    const catDiv = document.createElement('div');
+    catDiv.className = 'categoria';
+    catDiv.textContent = cat.nome;
+    catDiv.onclick = () => mostrarCategoria(cat.id, produtos);
+    divCategorias.appendChild(catDiv);
+  });
+
+  // Mostrar produtos da primeira categoria por padrão
+  if (categorias.length > 0) {
+    mostrarCategoria(categorias[0].id, produtos);
+  }
 }
 
-function adicionar(i) {
-  carrinho.push(produtos[i]);
-  renderCarrinho();
+function mostrarCategoria(catId, produtos) {
+  // Marcar categoria ativa
+  document.querySelectorAll('.categoria').forEach(el => el.classList.remove('ativa'));
+  event.target.classList.add('ativa');
+
+  const div = document.getElementById('produtos');
+  div.innerHTML = `<div class="secao"><h2>Batatas com Categoria ${catId}</h2></div>`;
+
+  produtos.filter(p => p.categoria_id === catId).forEach(p => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${p.img_url || 'https://via.placeholder.com/100x80'}" alt="${p.nome}" />
+      <div class="card-info">
+        <h3>${p.nome}</h3>
+        <p>${p.descricao || ''}</p>
+        <div class="preco">R$ ${p.preco.toFixed(2)}</div>
+        <button onclick="adicionarCarrinho('${p.nome}', ${p.preco})">Adicionar</button>
+      </div>`;
+    div.appendChild(card);
+  });
 }
 
-function renderCarrinho() {
-  const div = document.getElementById("carrinho");
-  div.innerHTML = "<h2>Carrinho:</h2>" + carrinho
-    .map((item) => `<div>${item.nome} - R$ ${item.preco.toFixed(2)}</div>`)
-    .join("");
-}
-
-function finalizarPedido() {
-  const nome = prompt("Digite seu nome:");
-  const endereco = prompt("Digite seu endereço:");
-  const telefone = prompt("Digite seu telefone:");
-  const taxa_entrega = 5.00;
-
-  const total = carrinho.reduce((soma, item) => soma + item.preco, 0) + taxa_entrega;
-
-  fetch(apiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      nome,
-      endereco,
-      telefone,
-      produtos: carrinho,
-      taxa_entrega,
-      total
-    }),
-  })
-    .then((res) => res.json())
-    .then((res) => {
-      alert("Pedido enviado com sucesso!");
-      if (res.pdf_url) window.open(res.pdf_url, "_blank");
-    });
-}
-
-renderProdutos();
+// Chama ao carregar a página
+window.onload = carregarCardapio;
