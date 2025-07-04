@@ -1,130 +1,78 @@
-import streamlit as st
+from flask import Flask, request, jsonify
 from supabase import create_client
-import pandas as pd
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
 import uuid
+import os
 from datetime import datetime
-import json
 
-# Configuração Supabase
+app = Flask(__name__)
+
+# Configurações Supabase (substitua pelos seus dados)
 SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
 SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Painel Quero Batata", layout="wide")
+PDF_FOLDER = "pdfs"
+os.makedirs(PDF_FOLDER, exist_ok=True)
 
-# Login com verificador
-if "logado" not in st.session_state:
-    st.session_state.logado = False
+@app.route("/api/pedido", methods=["POST"])
+def criar_pedido():
+    data = request.get_json()
 
-if not st.session_state.logado:
-    st.title("🔐 Login do Painel")
-    user = st.text_input("Usuário")
-    pwd = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        res = supabase.table("usuarios").select("*").eq("usuario", user).eq("senha", pwd).execute()
-        if res.data:
-            st.session_state.logado = True
-            st.session_state.usuario = user
-            st.success("Login realizado com sucesso!")
-            st.experimental_rerun()
-        else:
-            st.error("Usuário ou senha incorretos.")
-    st.stop()
+    # Valida campos obrigatórios
+    for campo in ["nome", "telefone", "endereco", "produtos", "taxa_entrega", "total"]:
+        if campo not in data:
+            return jsonify({"error": f"Campo '{campo}' obrigatório"}), 400
 
-# Menu lateral
-st.sidebar.title("Quero Batata - Admin")
-menu = st.sidebar.radio("Menu", ["Pedidos", "Cadastrar Produto", "Cadastrar Categoria", "Controle da Loja", "Dashboard"])
+    nome = data["nome"]
+    telefone = data["telefone"]
+    endereco = data["endereco"]
+    produtos = data["produtos"]  # Espera lista de dicts {nome, preco, qtd}
+    taxa_entrega = data["taxa_entrega"]
+    total = data["total"]
 
-# Pedidos
-if menu == "Pedidos":
-    st.title("📦 Pedidos Recebidos")
-    res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
-    dados = res.data
+    # Criar registro no Supabase
+    pedido = {
+        "nome_cliente": nome,
+        "telefone": telefone,
+        "endereco": endereco,
+        "produtos": str(produtos),  # Pode salvar como JSON string ou ajustar tipo na tabela
+        "taxa_entrega": taxa_entrega,
+        "total": total,
+        "criado_em": datetime.utcnow().isoformat()
+    }
+    supabase.table("pedidos").insert(pedido).execute()
 
-    if not dados:
-        st.info("Nenhum pedido encontrado.")
-    else:
-        for pedido in dados:
-            with st.container(border=True):
-                st.subheader(f"👤 {pedido['nome_cliente']}")
-                st.write(f"📞 {pedido['telefone']} | 🏠 {pedido['endereco']} | ⏰ {pedido['criado_em']}")
-                st.write(f"💰 Total: R$ {pedido['total']:.2f} | 🚚 Entrega: R$ {pedido['taxa_entrega']:.2f}")
-                st.markdown("**Produtos:**")
-                try:
-                    produtos = pedido['produtos']
-                    if isinstance(produtos, str):
-                        produtos = json.loads(produtos.replace("'", '"'))
-                    for item in produtos:
-                        st.markdown(f"- {item['nome']} - R$ {item['preco']:.2f}")
-                except:
-                    st.error("Erro ao ler produtos do pedido.")
+    # Gerar PDF do pedido
+    pdf_id = uuid.uuid4().hex
+    pdf_path = os.path.join(PDF_FOLDER, f"pedido_{pdf_id}.pdf")
 
-# Cadastro de Produto
-elif menu == "Cadastrar Produto":
-    st.title("🍟 Cadastrar Novo Produto")
-    nome = st.text_input("Nome do Produto")
-    preco = st.number_input("Preço", min_value=0.0, step=0.5)
-    categoria = st.text_input("Categoria")
-    imagem = st.file_uploader("Imagem do Produto", type=["png", "jpg", "jpeg"])
-    imagem_url = ""
+    c = canvas.Canvas(pdf_path, pagesize=letter)
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, 750, "Pedido Quero Batata")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 730, f"Cliente: {nome}")
+    c.drawString(50, 710, f"Telefone: {telefone}")
+    c.drawString(50, 690, f"Endereço: {endereco}")
+    c.drawString(50, 670, "Produtos:")
 
-    if imagem:
-        nome_arquivo = f"{uuid.uuid4().hex}_{imagem.name}"
-        supabase.storage.from_('produtos').upload(nome_arquivo, imagem)
-        imagem_url = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
+    y = 650
+    for item in produtos:
+        linha = f"{item['qtd']}x {item['nome']} - R$ {item['preco']:.2f}"
+        c.drawString(60, y, linha)
+        y -= 20
 
-    if st.button("Salvar Produto"):
-        if not imagem_url:
-            st.warning("Envie uma imagem primeiro.")
-        else:
-            supabase.table("produtos").insert({
-                "nome": nome,
-                "preco": preco,
-                "categoria": categoria,
-                "imagem_url": imagem_url,
-                "disponivel": True
-            }).execute()
-            st.success("Produto cadastrado com sucesso!")
+    c.drawString(50, y - 10, f"Taxa de entrega: R$ {taxa_entrega:.2f}")
+    c.drawString(50, y - 30, f"Total: R$ {total:.2f}")
 
-# Cadastrar Categoria
-elif menu == "Cadastrar Categoria":
-    st.title("📚 Nova Categoria")
-    nome_cat = st.text_input("Nome da Categoria")
-    if st.button("Salvar Categoria"):
-        supabase.table("categorias").insert({"nome": nome_cat}).execute()
-        st.success("Categoria salva com sucesso!")
+    c.save()
 
-# Controle da Loja
-elif menu == "Controle da Loja":
-    st.title("🏪 Status da Loja")
-    res = supabase.table("config").select("valor").eq("chave", "loja_aberta").single().execute()
-    loja_aberta = res.data and res.data['valor'] == 'true'
-    st.subheader("🟢 Aberta" if loja_aberta else "🔴 Fechada")
+    # Aqui pode ser feito upload do PDF para storage e gerar URL público
+    # Para simplificar, retornamos o caminho local do PDF (adaptar conforme deploy)
+    pdf_url = f"/pdfs/pedido_{pdf_id}.pdf"
 
-    nova = not loja_aberta
-    if st.button("Abrir Loja" if nova else "Fechar Loja"):
-        valor = 'true' if nova else 'false'
-        supabase.table("config").upsert({"chave": "loja_aberta", "valor": valor}).execute()
-        st.success("Status da loja atualizado!")
-        st.experimental_rerun()
+    return jsonify({"message": "Pedido criado com sucesso", "pdf_url": pdf_url}), 201
 
-# Dashboard
-elif menu == "Dashboard":
-    st.title("📊 Produtos Mais Vendidos")
-    res = supabase.table("pedidos").select("produtos").execute()
-    contagem = {}
-
-    for pedido in res.data:
-        try:
-            produtos = pedido['produtos']
-            if isinstance(produtos, str):
-                produtos = json.loads(produtos.replace("'", '"'))
-            for item in produtos:
-                nome = item['nome']
-                contagem[nome] = contagem.get(nome, 0) + 1
-        except:
-            continue
-
-    df = pd.DataFrame(list(contagem.items()), columns=["Produto", "Vendas"])
-    df = df.sort_values("Vendas", ascending=False)
-    st.bar_chart(df.set_index("Produto"))
+if __name__ == "__main__":
+    app.run(debug=True)
