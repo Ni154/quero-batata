@@ -15,7 +15,7 @@ st.title("📦 Painel de Pedidos - Quero Batata")
 st.markdown("Veja aqui os pedidos mais recentes. Para atualizar, recarregue a página.")
 
 # Buscar pedidos
-res = supabase.table("pedidos").select("*").order("data", desc=True).execute()
+res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
 dados = res.data
 
 if not dados:
