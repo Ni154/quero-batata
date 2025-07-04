@@ -7,8 +7,8 @@ import os
 import uuid
 
 # 🔑 Supabase config (substitua pelos seus dados)
-SUPABASE_URL = "https://SEU_PROJETO.supabase.co"
-SUPABASE_KEY = "SUA_CHAVE_PUBLICA"
+SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
+SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 📁 Pasta onde os PDFs serão salvos
