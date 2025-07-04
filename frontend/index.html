@@ -86,7 +86,7 @@
       box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
     .carrinho h3 { margin-top: 0; }
-    .carrinho ul { padding-left: 20px; }
+    .carrinho ul { padding-left: 20px; margin:0; }
     .carrinho button {
       background: #ff9900;
       color: white;
@@ -101,6 +101,42 @@
         width: 90%;
         right: 5%;
       }
+    }
+    /* Modal para finalizar pedido */
+    #modalPedido {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #modalPedido .modal-conteudo {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+    }
+    #modalPedido input, #modalPedido textarea {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      padding: 8px;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    #modalPedido button {
+      background: #ff9900;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -128,10 +164,24 @@
     <h3>Carrinho</h3>
     <div id="carrinho-itens">Seu carrinho está vazio.</div>
     <strong>Total: R$ <span id="total">0,00</span></strong><br/>
-    <button onclick="finalizarPedido()">Finalizar Pedido</button>
+    <button onclick="abrirModalPedido()">Finalizar Pedido</button>
+  </div>
+
+  <!-- Modal Finalizar Pedido -->
+  <div id="modalPedido">
+    <div class="modal-conteudo">
+      <h3>Finalizar Pedido</h3>
+      <p><strong>Total com entrega: R$ <span id="modalTotal">0,00</span></strong></p>
+      <label>Nome:<br><input type="text" id="nome" /></label>
+      <label>Telefone:<br><input type="text" id="telefone" /></label>
+      <label>Endereço:<br><textarea id="endereco"></textarea></label>
+      <button onclick="enviarPedido()">Enviar Pedido</button>
+    </div>
   </div>
 
   <script>
+    const API_BASE_URL = "https://quero-batata-production.up.railway.app";
+
     const produtos = {
       bacon: [{ nome: "Bacon com brócolis", preco: 36, desc: "Batata com bacon e brócolis.", img: "https://images.unsplash.com/photo-1604908177875-bf49b6d21194" }],
       camarao: [{ nome: "Camarão cremoso", preco: 42, desc: "Batata com creme de camarão e alho poró.", img: "https://images.unsplash.com/photo-1551183053-bf91a1d81141" }],
@@ -185,9 +235,29 @@
       document.getElementById("total").innerText = total.toFixed(2);
     }
 
-    function finalizarPedido() {
+    function abrirModalPedido() {
       if (carrinho.length === 0) {
         alert("Adicione itens ao carrinho.");
+        return;
+      }
+      const taxa_entrega = 5.00;
+      const subtotal = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0);
+      const total = subtotal + taxa_entrega;
+      document.getElementById("modalTotal").innerText = total.toFixed(2);
+      document.getElementById("modalPedido").style.display = "flex";
+    }
+
+    function fecharModalPedido() {
+      document.getElementById("modalPedido").style.display = "none";
+    }
+
+    function enviarPedido() {
+      const nome = document.getElementById("nome").value.trim();
+      const telefone = document.getElementById("telefone").value.trim();
+      const endereco = document.getElementById("endereco").value.trim();
+
+      if (!nome || !telefone || !endereco) {
+        alert("Preencha todos os campos!");
         return;
       }
 
@@ -195,36 +265,11 @@
       const subtotal = carrinho.reduce((s, i) => s + i.qtd * i.preco, 0);
       const total = subtotal + taxa_entrega;
 
-      const formHtml = `
-        <div style="padding:10px;">
-          <h3>Finalizar Pedido</h3>
-          <p><strong>Total com entrega: R$ ${total.toFixed(2)}</strong></p>
-          <label>Nome:<br><input id="nome" style="width:100%" /></label><br><br>
-          <label>Telefone:<br><input id="telefone" style="width:100%" /></label><br><br>
-          <label>Endereço:<br><textarea id="endereco" style="width:100%"></textarea></label><br><br>
-          <button onclick="enviarPedido(${taxa_entrega}, ${total})">Enviar Pedido</button>
-        </div>
-      `;
-
-      const janela = window.open("", "Finalizar Pedido", "width=400,height=500");
-      janela.document.write(`<html><body>${formHtml}</body></html>`);
-    }
-
-    function enviarPedido(taxa_entrega, total) {
-      const nome = document.getElementById("nome").value;
-      const telefone = document.getElementById("telefone").value;
-      const endereco = document.getElementById("endereco").value;
-
-      if (!nome || !telefone || !endereco) {
-        alert("Preencha todos os campos!");
-        return;
-      }
-
-      fetch("https://quero-batata.up.railway.app/api/pedido", {
+      fetch(`${API_BASE_URL}/api/pedido`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nome_cliente: nome,
+          nome,
           telefone,
           endereco,
           produtos: carrinho,
@@ -232,17 +277,17 @@
           total
         })
       })
-        .then(res => res.json())
-        .then(data => {
-          alert("Pedido enviado com sucesso!");
-          carrinho = [];
-          window.close();
-          location.reload();
-        })
-        .catch(err => {
-          console.error(err);
-          alert("Erro ao enviar pedido.");
-        });
+      .then(res => res.json())
+      .then(data => {
+        alert("Pedido enviado com sucesso!");
+        carrinho = [];
+        atualizarCarrinho();
+        fecharModalPedido();
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Erro ao enviar pedido.");
+      });
     }
 
     mostrarCategoria("bacon");
