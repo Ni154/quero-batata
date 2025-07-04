@@ -1,86 +1,105 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from supabase import create_client, Client
-from reportlab.pdfgen import canvas
-import os
-import uuid
-import jwt
-import datetime
+import streamlit as st
+import requests
 
-# 🔧 Configurações
-SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
-SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
-JWT_SECRET = "chave_super_secreta"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+API_BASE_URL = "https://quero-batata-production.up.railway.app"
 
-app = Flask(__name__)
-CORS(app)
+st.title("Painel Administrativo Quero Batata")
 
-PDF_DIR = "pdfs"
-os.makedirs(PDF_DIR, exist_ok=True)
+# --- Categorias ---
 
-# 🔐 Login com Supabase e JWT
-@app.route("/api/login", methods=["POST"])
-def login():
-    data = request.json
-    usuario = data.get("usuario")
-    senha = data.get("senha")
+def listar_categorias():
+    r = requests.get(f"{API_BASE_URL}/api/categorias")
+    if r.status_code == 200:
+        return r.json()
+    else:
+        st.error("Erro ao carregar categorias")
+        return []
 
-    res = supabase.table("usuarios").select("*").eq("usuario", usuario).eq("senha", senha).execute()
-    if res.data:
-        token = jwt.encode({
-            "usuario": usuario,
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=12)
-        }, JWT_SECRET, algorithm="HS256")
-        return jsonify({"token": token, "usuario": usuario})
-    return jsonify({"erro": "Usuário ou senha incorretos"}), 401
+def criar_categoria(nome):
+    r = requests.post(f"{API_BASE_URL}/api/categorias", json={"nome": nome})
+    if r.status_code == 201:
+        st.success("Categoria criada!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
 
-# 📦 Pedido com PDF
-@app.route("/api/pedido", methods=["POST"])
-def pedido():
-    data = request.json
-    nome = data.get("nome")
-    endereco = data.get("endereco")
-    telefone = data.get("telefone")
-    produtos = data.get("produtos")
-    taxa_entrega = data.get("taxa_entrega", 5.0)
-    total = data.get("total")
-    criado_em = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def editar_categoria(id, nome):
+    r = requests.put(f"{API_BASE_URL}/api/categorias/{id}", json={"nome": nome})
+    if r.status_code == 200:
+        st.success("Categoria atualizada!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
 
-    supabase.table("pedidos").insert({
-        "nome_cliente": nome,
-        "telefone": telefone,
-        "endereco": endereco,
-        "produtos": produtos,
-        "taxa_entrega": taxa_entrega,
-        "total": total,
-        "criado_em": criado_em
-    }).execute()
+def excluir_categoria(id):
+    r = requests.delete(f"{API_BASE_URL}/api/categorias/{id}")
+    if r.status_code == 200:
+        st.success("Categoria excluída!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
 
-    # 🧾 PDF
-    filename = f"{uuid.uuid4().hex[:8]}_{nome.replace(' ', '_')}.pdf"
-    path = os.path.join(PDF_DIR, filename)
-    c = canvas.Canvas(path)
-    c.drawString(50, 800, "📄 Pedido - Quero Batata")
-    c.drawString(50, 780, f"Cliente: {nome}")
-    c.drawString(50, 760, f"Endereço: {endereco}")
-    c.drawString(50, 740, f"Telefone: {telefone}")
-    y = 720
-    for p in produtos:
-        c.drawString(60, y, f"- {p['nome']} R$ {p['preco']:.2f}")
-        y -= 20
-    c.drawString(50, y, f"Entrega: R$ {taxa_entrega:.2f}")
-    c.drawString(50, y - 20, f"Total: R$ {total:.2f}")
-    c.save()
+# --- Produtos ---
 
-    return jsonify({
-        "mensagem": "Pedido enviado com sucesso!",
-        "pdf_url": f"/api/download/{filename}"
+def listar_produtos():
+    r = requests.get(f"{API_BASE_URL}/api/produtos")
+    if r.status_code == 200:
+        return r.json()
+    else:
+        st.error("Erro ao carregar produtos")
+        return []
+
+def criar_produto(nome, preco, categoria_id):
+    r = requests.post(f"{API_BASE_URL}/api/produtos", json={
+        "nome": nome,
+        "preco": preco,
+        "categoria_id": categoria_id
     })
+    if r.status_code == 201:
+        st.success("Produto criado!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
 
-@app.route("/api/download/<filename>")
-def download(filename):
-    return send_from_directory(PDF_DIR, filename, as_attachment=True)
+def editar_produto(id, nome, preco, categoria_id):
+    r = requests.put(f"{API_BASE_URL}/api/produtos/{id}", json={
+        "nome": nome,
+        "preco": preco,
+        "categoria_id": categoria_id
+    })
+    if r.status_code == 200:
+        st.success("Produto atualizado!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+def excluir_produto(id):
+    r = requests.delete(f"{API_BASE_URL}/api/produtos/{id}")
+    if r.status_code == 200:
+        st.success("Produto excluído!")
+    else:
+        st.error(f"Erro: {r.json().get('error')}")
+
+# --- Interface simples para testar ---
+
+st.header("Categorias")
+
+categorias = listar_categorias()
+for cat in categorias:
+    st.write(f"{cat['id']}: {cat['nome']}")
+
+with st.form("form_categorias"):
+    nome_cat = st.text_input("Nova categoria")
+    submitted = st.form_submit_button("Criar categoria")
+    if submitted and nome_cat:
+        criar_categoria(nome_cat)
+
+st.header("Produtos")
+
+produtos = listar_produtos()
+for prod in produtos:
+    st.write(f"{prod['id']}: {prod['nome']} - R$ {prod['preco']} (Categoria {prod['categoria_id']})")
+
+with st.form("form_produtos"):
+    nome_prod = st.text_input("Nome do produto")
+    preco_prod = st.number_input("Preço", min_value=0.0, step=0.5)
+    cat_ids = [c['id'] for c in categorias]
+    cat_id_selecionada = st.selectbox("Categoria", cat_ids)
+    submitted_prod = st.form_submit_button("Criar produto")
+    if submitted_prod and nome_prod:
+        criar_produto(nome_prod, preco_prod, cat_id_selecionada)
