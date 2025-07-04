@@ -21,6 +21,7 @@ if not st.session_state.logado:
     pwd = st.text_input("Senha", type="password")
     if st.button("Entrar"):
         res = supabase.table("usuarios").select("*").eq("usuario", user).eq("senha", pwd).execute()
+        st.write("Consulta retornou:", res.data)
         if res.data:
             st.session_state.logado = True
             st.session_state.usuario = user
