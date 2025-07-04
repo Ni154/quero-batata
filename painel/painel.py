@@ -1,112 +1,187 @@
 import streamlit as st
 from supabase import create_client
-import pandas as pd
 from datetime import datetime
-import uuid
 
-# 🔑 Supabase config
+# Config Supabase
 SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
 SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="Painel Quero Batata", layout="wide")
+# Usuários autorizados para login (alterar conforme quiser)
+USUARIOS = {
+    "admin": "senha123"
+}
 
-# 🔐 Login simples
+# ----- LOGIN -----
 if "logado" not in st.session_state:
     st.session_state.logado = False
 
 if not st.session_state.logado:
-    st.title("🔐 Login do Painel")
-    user = st.text_input("Usuário")
-    pwd = st.text_input("Senha", type="password")
+    st.title("🔐 Login - Painel Quero Batata")
+    usuario = st.text_input("Usuário")
+    senha = st.text_input("Senha", type="password")
     if st.button("Entrar"):
-        res = supabase.table("usuarios").select("*").eq("usuario", user).eq("senha", pwd).execute()
-        if res.data:
+        if usuario in USUARIOS and USUARIOS[usuario] == senha:
             st.session_state.logado = True
-            st.session_state.usuario = user
-            st.success("Login realizado com sucesso!")
             st.experimental_rerun()
         else:
             st.error("Usuário ou senha incorretos.")
     st.stop()
 
-st.sidebar.title("Quero Batata - Admin")
-menu = st.sidebar.radio("Menu", ["Pedidos", "Cadastrar Produto", "Cadastrar Categoria", "Controle da Loja", "Dashboard"])
+# ------ PAINEL ------
+st.set_page_config(page_title="Painel Quero Batata", layout="wide")
+st.title("📦 Painel Administrativo - Quero Batata")
 
-# 📅 Pedidos
+menu = st.sidebar.selectbox("Menu", ["Pedidos", "Produtos", "Categorias", "Loja", "Dashboard"])
+
+# ------- ABRIR/FECHAR LOJA --------
+def get_loja_status():
+    res = supabase.table("config").select("valor").eq("chave", "loja_aberta").single().execute()
+    if res.data:
+        return res.data["valor"] == "true"
+    return False
+
+def set_loja_status(aberta: bool):
+    existe = supabase.table("config").select("chave").eq("chave", "loja_aberta").execute()
+    if existe.data:
+        supabase.table("config").update({"valor": "true" if aberta else "false"}).eq("chave", "loja_aberta").execute()
+    else:
+        supabase.table("config").insert({"chave": "loja_aberta", "valor": "true" if aberta else "false"}).execute()
+
+# ------- MENU: LOJA --------
+if menu == "Loja":
+    st.header("🟢 Abrir / 🔴 Fechar Loja")
+    aberta = get_loja_status()
+    st.write(f"Status atual da loja: {'Aberta' if aberta else 'Fechada'}")
+    if aberta:
+        if st.button("Fechar Loja"):
+            set_loja_status(False)
+            st.success("Loja fechada!")
+            st.experimental_rerun()
+    else:
+        if st.button("Abrir Loja"):
+            set_loja_status(True)
+            st.success("Loja aberta!")
+            st.experimental_rerun()
+
+# ------- MENU: CATEGORIAS --------
+if menu == "Categorias":
+    st.header("📁 Gerenciar Categorias")
+
+    with st.form("form_categoria"):
+        nova_categoria = st.text_input("Nova categoria")
+        enviar = st.form_submit_button("Adicionar Categoria")
+        if enviar:
+            if not nova_categoria:
+                st.warning("Digite o nome da categoria")
+            else:
+                # Verifica se já existe
+                cat_existe = supabase.table("categorias").select("*").eq("nome", nova_categoria).execute()
+                if cat_existe.data:
+                    st.warning("Categoria já existe")
+                else:
+                    supabase.table("categorias").insert({"nome": nova_categoria}).execute()
+                    st.success(f"Categoria '{nova_categoria}' adicionada!")
+                    st.experimental_rerun()
+
+    # Listar categorias
+    categorias = supabase.table("categorias").select("*").execute()
+    if categorias.data:
+        st.subheader("Categorias cadastradas")
+        for cat in categorias.data:
+            st.write(f"- {cat['nome']}")
+
+# ------- MENU: PRODUTOS --------
+if menu == "Produtos":
+    st.header("🍟 Gerenciar Produtos")
+
+    categorias = supabase.table("categorias").select("*").execute()
+    cat_list = [c["nome"] for c in categorias.data] if categorias.data else []
+
+    with st.form("form_produto"):
+        nome = st.text_input("Nome do produto")
+        preco = st.number_input("Preço (R$)", min_value=0.0, format="%.2f")
+        img_url = st.text_input("URL da imagem")
+        categoria = st.selectbox("Categoria", cat_list)
+        enviar = st.form_submit_button("Adicionar Produto")
+
+        if enviar:
+            if not nome or preco <= 0 or not categoria:
+                st.warning("Preencha nome, preço válido e categoria")
+            else:
+                supabase.table("produtos").insert({
+                    "nome": nome,
+                    "preco": preco,
+                    "imagem": img_url,
+                    "categoria": categoria
+                }).execute()
+                st.success(f"Produto '{nome}' adicionado!")
+                st.experimental_rerun()
+
+    # Listar produtos
+    produtos = supabase.table("produtos").select("*").execute()
+    if produtos.data:
+        st.subheader("Produtos cadastrados")
+        for p in produtos.data:
+            st.write(f"- {p['nome']} (R$ {p['preco']:.2f}) — Categoria: {p['categoria']}")
+
+# ------- MENU: PEDIDOS --------
 if menu == "Pedidos":
-    st.title("📦 Pedidos Recebidos")
+    st.header("📋 Pedidos Recentes")
+
     res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
     dados = res.data
 
     if not dados:
-        st.info("Nenhum pedido encontrado.")
+        st.info("Nenhum pedido registrado ainda.")
     else:
         for pedido in dados:
-            with st.container(border=True):
-                st.subheader(f"👤 {pedido['nome_cliente']}")
-                st.write(f"📞 {pedido['telefone']} | 🏠 {pedido['endereco']} | ⏰ {pedido['criado_em']}")
-                st.write(f"💰 Total: R$ {pedido['total']:.2f} | 🚚 Entrega: R$ {pedido['taxa_entrega']:.2f}")
-                st.markdown("**Produtos:**")
-                try:
-                    for item in pedido['produtos']:
-                        st.markdown(f"- {item['nome']} - R$ {item['preco']:.2f}")
-                except:
-                    st.error("Erro ao ler produtos do pedido.")
+            with st.container():
+                col1, col2 = st.columns(2)
 
-# 💼 Cadastro de Produto
-elif menu == "Cadastrar Produto":
-    st.title("🍔 Cadastrar Novo Produto")
-    nome = st.text_input("Nome do Produto")
-    preco = st.number_input("Preço", min_value=0.0, step=0.5)
-    categoria = st.text_input("Categoria")
-    imagem = st.text_input("URL da Imagem")
-    if st.button("Salvar Produto"):
-        supabase.table("produtos").insert({
-            "nome": nome,
-            "preco": preco,
-            "categoria": categoria,
-            "imagem_url": imagem,
-            "disponivel": True
-        }).execute()
-        st.success("Produto cadastrado com sucesso!")
+                with col1:
+                    st.subheader(f"👤 {pedido['nome']}")
+                    st.write(f"📞 {pedido['telefone']}")
+                    st.write(f"📍 {pedido['endereco']}")
+                    st.write(f"🕒 {pedido['data']}")
+                    st.write(f"💰 Total: R$ {pedido['total']:.2f}")
+                    st.write(f"🚚 Taxa de entrega: R$ {pedido['taxa_entrega']:.2f}")
 
-# 📄 Cadastro de Categoria
-elif menu == "Cadastrar Categoria":
-    st.title("📚 Cadastrar Nova Categoria")
-    nome_cat = st.text_input("Nome da Categoria")
-    if st.button("Salvar Categoria"):
-        supabase.table("categorias").insert({"nome": nome_cat}).execute()
-        st.success("Categoria cadastrada com sucesso!")
+                with col2:
+                    st.subheader("🧀 Produtos:")
+                    try:
+                        itens = eval(pedido["produtos"])
+                        for item in itens:
+                            st.markdown(f"- {item['nome']} - R$ {item['preco']:.2f}")
+                    except:
+                        st.error("Erro ao exibir produtos.")
 
-# ⚖️ Controle de Loja
-elif menu == "Controle da Loja":
-    st.title("🏠 Status da Loja")
-    res = supabase.table("config").select("valor").eq("chave", "loja_aberta").single().execute()
-    loja_aberta = res.data['valor'] == 'true' if res.data else False
+        st.success(f"Total de pedidos encontrados: {len(dados)}")
 
-    status = "🛡️ Loja Aberta" if loja_aberta else "❌ Loja Fechada"
-    st.subheader(status)
-    nova = not loja_aberta
-    if st.button("Abrir Loja" if nova else "Fechar Loja"):
-        valor = 'true' if nova else 'false'
-        supabase.table("config").upsert({"chave": "loja_aberta", "valor": valor}).execute()
-        st.success("Status atualizado!")
-        st.experimental_rerun()
+# ------- MENU: DASHBOARD --------
+if menu == "Dashboard":
+    st.header("📊 Dashboard")
 
-# 🔢 Dashboard
-elif menu == "Dashboard":
-    st.title("📊 Produtos Mais Vendidos")
-    res = supabase.table("pedidos").select("produtos").execute()
-    contagem = {}
-    for pedido in res.data:
-        try:
-            for item in pedido['produtos']:
-                nome = item['nome']
-                contagem[nome] = contagem.get(nome, 0) + 1
-        except:
-            continue
+    pedidos = supabase.table("pedidos").select("*").execute()
+    if not pedidos.data:
+        st.info("Nenhum pedido para análise.")
+    else:
+        # Contar vendas por produto
+        contador = {}
+        for p in pedidos.data:
+            try:
+                produtos_pedido = eval(p["produtos"])
+                for item in produtos_pedido:
+                    nome = item["nome"]
+                    qtd = item.get("qtd", 1)
+                    contador[nome] = contador.get(nome, 0) + qtd
+            except:
+                continue
 
-    df = pd.DataFrame(list(contagem.items()), columns=["Produto", "Vendas"])
-    df = df.sort_values("Vendas", ascending=False)
-    st.bar_chart(df.set_index("Produto"))
+        if not contador:
+            st.info("Nenhuma venda registrada.")
+        else:
+            st.subheader("Produtos mais vendidos:")
+            produtos_ordenados = sorted(contador.items(), key=lambda x: x[1], reverse=True)
+            for nome, qtd in produtos_ordenados:
+                st.write(f"- {nome}: {qtd} unidades")
