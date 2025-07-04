@@ -1,105 +1,105 @@
-import streamlit as st
-import requests
+# backend/app.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from supabase import create_client
+import os
+import uuid
+from datetime import datetime
 
-API_BASE_URL = "https://quero-batata-production.up.railway.app"
+app = Flask(__name__)
+CORS(app)
 
-st.title("Painel Administrativo Quero Batata")
-
-# --- Categorias ---
-
-def listar_categorias():
-    r = requests.get(f"{API_BASE_URL}/api/categorias")
-    if r.status_code == 200:
-        return r.json()
-    else:
-        st.error("Erro ao carregar categorias")
-        return []
-
-def criar_categoria(nome):
-    r = requests.post(f"{API_BASE_URL}/api/categorias", json={"nome": nome})
-    if r.status_code == 201:
-        st.success("Categoria criada!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
-
-def editar_categoria(id, nome):
-    r = requests.put(f"{API_BASE_URL}/api/categorias/{id}", json={"nome": nome})
-    if r.status_code == 200:
-        st.success("Categoria atualizada!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
-
-def excluir_categoria(id):
-    r = requests.delete(f"{API_BASE_URL}/api/categorias/{id}")
-    if r.status_code == 200:
-        st.success("Categoria excluída!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
+SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
+SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Produtos ---
+@app.route('/api/produtos', methods=['GET', 'POST'])
+def produtos():
+    if request.method == 'GET':
+        res = supabase.table("produtos").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        novo = {
+            "nome": data.get("nome"),
+            "preco": data.get("preco"),
+            "categoria_id": data.get("categoria_id"),
+            "imagem_url": data.get("imagem_url", ""),
+            "disponivel": True
+        }
+        supabase.table("produtos").insert(novo).execute()
+        return jsonify({"message": "Produto criado"}), 201
 
-def listar_produtos():
-    r = requests.get(f"{API_BASE_URL}/api/produtos")
-    if r.status_code == 200:
-        return r.json()
-    else:
-        st.error("Erro ao carregar produtos")
-        return []
+@app.route('/api/produtos/<int:id>', methods=['PUT', 'DELETE'])
+def produto_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("produtos").update(data).eq("id", id).execute()
+        return jsonify({"message": "Produto atualizado"})
+    if request.method == 'DELETE':
+        supabase.table("produtos").delete().eq("id", id).execute()
+        return jsonify({"message": "Produto excluído"})
 
-def criar_produto(nome, preco, categoria_id):
-    r = requests.post(f"{API_BASE_URL}/api/produtos", json={
-        "nome": nome,
-        "preco": preco,
-        "categoria_id": categoria_id
-    })
-    if r.status_code == 201:
-        st.success("Produto criado!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
+# --- Categorias ---
+@app.route('/api/categorias', methods=['GET', 'POST'])
+def categorias():
+    if request.method == 'GET':
+        res = supabase.table("categorias").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        supabase.table("categorias").insert({"nome": data.get("nome")}).execute()
+        return jsonify({"message": "Categoria criada"}), 201
 
-def editar_produto(id, nome, preco, categoria_id):
-    r = requests.put(f"{API_BASE_URL}/api/produtos/{id}", json={
-        "nome": nome,
-        "preco": preco,
-        "categoria_id": categoria_id
-    })
-    if r.status_code == 200:
-        st.success("Produto atualizado!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
+@app.route('/api/categorias/<int:id>', methods=['PUT', 'DELETE'])
+def categoria_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("categorias").update(data).eq("id", id).execute()
+        return jsonify({"message": "Categoria atualizada"})
+    if request.method == 'DELETE':
+        supabase.table("categorias").delete().eq("id", id).execute()
+        return jsonify({"message": "Categoria excluída"})
 
-def excluir_produto(id):
-    r = requests.delete(f"{API_BASE_URL}/api/produtos/{id}")
-    if r.status_code == 200:
-        st.success("Produto excluído!")
-    else:
-        st.error(f"Erro: {r.json().get('error')}")
+# --- Pedidos ---
+@app.route('/api/pedido', methods=['POST'])
+def novo_pedido():
+    data = request.json
+    pedido = {
+        "nome_cliente": data.get("nome"),
+        "telefone": data.get("telefone"),
+        "endereco": data.get("endereco"),
+        "produtos": data.get("produtos"),
+        "taxa_entrega": data.get("taxa_entrega"),
+        "total": data.get("total"),
+        "status": "Recebido",
+        "criado_em": datetime.now().isoformat()
+    }
+    supabase.table("pedidos").insert(pedido).execute()
+    return jsonify({"message": "Pedido recebido"})
 
-# --- Interface simples para testar ---
+# --- Upload de imagem para produtos ---
+@app.route('/api/upload', methods=['POST'])
+def upload_imagem():
+    if 'file' not in request.files:
+        return jsonify({"error": "Arquivo não enviado"}), 400
+    file = request.files['file']
+    nome_arquivo = f"produtos/{uuid.uuid4().hex}_{file.filename}"
+    supabase.storage.from_('produtos').upload(nome_arquivo, file)
+    url_publica = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
+    return jsonify({"url": url_publica})
 
-st.header("Categorias")
+# --- Status da loja ---
+@app.route('/api/status', methods=['GET', 'POST'])
+def status_loja():
+    if request.method == 'GET':
+        res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+        return jsonify({"loja_aberta": res.data['valor'] == 'true' if res.data else False})
+    if request.method == 'POST':
+        data = request.json
+        supabase.table("config").upsert({"chave": "loja_aberta", "valor": "true" if data.get("loja_aberta") else "false"}).execute()
+        return jsonify({"message": "Status atualizado"})
 
-categorias = listar_categorias()
-for cat in categorias:
-    st.write(f"{cat['id']}: {cat['nome']}")
-
-with st.form("form_categorias"):
-    nome_cat = st.text_input("Nova categoria")
-    submitted = st.form_submit_button("Criar categoria")
-    if submitted and nome_cat:
-        criar_categoria(nome_cat)
-
-st.header("Produtos")
-
-produtos = listar_produtos()
-for prod in produtos:
-    st.write(f"{prod['id']}: {prod['nome']} - R$ {prod['preco']} (Categoria {prod['categoria_id']})")
-
-with st.form("form_produtos"):
-    nome_prod = st.text_input("Nome do produto")
-    preco_prod = st.number_input("Preço", min_value=0.0, step=0.5)
-    cat_ids = [c['id'] for c in categorias]
-    cat_id_selecionada = st.selectbox("Categoria", cat_ids)
-    submitted_prod = st.form_submit_button("Criar produto")
-    if submitted_prod and nome_prod:
-        criar_produto(nome_prod, preco_prod, cat_id_selecionada)
+if __name__ == '__main__':
+    app.run(debug=True)
