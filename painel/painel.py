@@ -5,8 +5,8 @@ import json
 from datetime import datetime
 
 # 🔑 Supabase config (substitua com os seus dados)
-SUPABASE_URL = "https://SEU_PROJETO.supabase.co"
-SUPABASE_KEY = "SUA_CHAVE_PUBLICA"
+SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
+SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Painel Quero Batata", layout="wide")
