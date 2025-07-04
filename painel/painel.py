@@ -62,16 +62,16 @@ elif menu == "Cadastrar Produto":
     preco = st.number_input("Preço", min_value=0.0, step=0.5)
     categoria = st.text_input("Categoria")
     imagem_file = st.file_uploader("Imagem do Produto", type=["jpg", "png", "jpeg"])
-imagem_url = ""
+    imagem_url = ""
 
-if imagem_file:
-    nome_arquivo = f"{uuid.uuid4().hex}_{imagem_file.name}"
-    supabase.storage.from_('produtos').upload(nome_arquivo, imagem_file)
-    imagem_url = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
+    if imagem_file:
+        nome_arquivo = f"{uuid.uuid4().hex}_{imagem_file.name}"
+        supabase.storage.from_('produtos').upload(nome_arquivo, imagem_file)
+        imagem_url = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
 
     if st.button("Salvar Produto"):
-    if not imagem_url:
-        st.error("Envie uma imagem antes de salvar.")
+        if not imagem_url:
+            st.error("Envie uma imagem antes de salvar.")
     else:
         supabase.table("produtos").insert({
             "nome": nome,
