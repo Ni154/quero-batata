@@ -18,6 +18,11 @@ os.makedirs(PDF_DIR, exist_ok=True)
 app = Flask(__name__)
 CORS(app)
 
+# ✅ Rota padrão para confirmar que o app está rodando
+@app.route("/")
+def home():
+    return "API Quero Batata funcionando!"
+
 @app.route("/api/pedido", methods=["POST"])
 def pedido():
     data = request.json
@@ -68,8 +73,5 @@ def download(filename):
     return send_from_directory(PDF_DIR, filename, as_attachment=True)
 
 if __name__ == "__main__":
-    import os
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
