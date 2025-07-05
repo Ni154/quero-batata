@@ -71,15 +71,17 @@ def novo_pedido():
 
     data = request.json
     pedido = {
-        "nome_cliente": data.get("nome"),
-        "telefone": data.get("telefone"),
-        "endereco": data.get("endereco"),
-        "produtos": data.get("produtos"),
-        "taxa_entrega": data.get("taxa_entrega"),
-        "total": data.get("total"),
-        "status": "Recebido",
-        "criado_em": datetime.now().isoformat()
+    "nome_cliente": data.get("nome"),
+    "telefone": data.get("telefone"),
+    "endereco": data.get("endereco"),
+    "produtos": data.get("produtos"),
+    "taxa_entrega": data.get("taxa_entrega"),
+    "total": data.get("total"),
+    "forma_pagamento": data.get("forma_pagamento"),  # novo campo
+    "status": "Recebido",
+    "criado_em": datetime.now().isoformat()
     }
+
     resultado = supabase.table("pedidos").insert(pedido).execute()
 
     if resultado.error:
