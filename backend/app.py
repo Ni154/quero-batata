@@ -1,8 +1,6 @@
-# backend/app.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client
-import os
 import uuid
 from datetime import datetime
 
@@ -65,6 +63,13 @@ def categoria_update(id):
 # --- Pedidos ---
 @app.route('/api/pedido', methods=['POST'])
 def novo_pedido():
+    # Verifica status da loja antes de aceitar pedido
+    status_res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+    loja_aberta = status_res.data['valor'] == 'true' if status_res.data else False
+
+    if not loja_aberta:
+        return jsonify({"error": "A loja está fechada no momento. Não é possível fazer pedidos."}), 403
+
     data = request.json
     pedido = {
         "nome_cliente": data.get("nome"),
