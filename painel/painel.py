@@ -51,7 +51,7 @@ if menu == "Pedidos":
     for p in finalizados:
         st.write(f"{p.get('nome_cliente')} - R$ {p.get('total')}")
 
-# --- PRODUTOS ---
+# --- PRODUTOS ---# --- PRODUTOS ---
 elif menu == "Produtos":
     st.title("Produtos")
     prod_res = requests.get(f"{API_BASE_URL}/api/produtos")
@@ -59,17 +59,19 @@ elif menu == "Produtos":
     produtos = prod_res.json() if prod_res.status_code == 200 else []
     categorias = cat_res.json() if cat_res.status_code == 200 else []
 
-    cat_dict = {c["nome"]: c["id"] for c in categorias}
+    # Dicionário ID -> Nome da categoria
+    cat_dict = {c["id"]: c["nome"] for c in categorias}
+    cat_nome_to_id = {c["nome"]: c["id"] for c in categorias}
 
     with st.form("form_produto"):
         nome = st.text_input("Nome")
         preco = st.number_input("Preço", min_value=0.0, step=0.5)
-        categoria_nome = st.selectbox("Categoria", list(cat_dict.keys()))
+        categoria_nome = st.selectbox("Categoria", list(cat_nome_to_id.keys()))
         imagem = st.file_uploader("Imagem do produto", type=["png", "jpg", "jpeg"])
         submit = st.form_submit_button("Adicionar Produto")
 
         if submit:
-            categoria_id = cat_dict[categoria_nome]
+            categoria_id = cat_nome_to_id[categoria_nome]
             imagem_url = ""
 
             if imagem:
@@ -98,15 +100,18 @@ elif menu == "Produtos":
 
     st.subheader("📦 Produtos Cadastrados")
     for p in produtos:
+        nome_categoria = cat_dict.get(p.get("categoria_id"), "Sem categoria")
         col1, col2 = st.columns([4, 1])
         with col1:
-            st.write(f"**{p.get('nome')}** - R$ {p.get('preco')} | Categoria ID: {p.get('categoria_id')}")
+            st.write(f"**{p.get('nome')}** - R$ {p.get('preco')} | Categoria: {nome_categoria}")
         with col2:
             if st.button("Excluir", key=f"delprod_{p.get('id')}"):
                 requests.delete(f"{API_BASE_URL}/api/produtos/{p.get('id')}")
                 st.rerun()
+            else:
+                st.error("Erro ao criar produto.")
 
-# --- CATEGORIAS ---
+  # --- CATEGORIAS ---
 elif menu == "Categorias":
     st.title("Categorias")
     res = requests.get(f"{API_BASE_URL}/api/categorias")
