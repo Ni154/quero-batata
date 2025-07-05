@@ -141,8 +141,16 @@ elif menu == "Categorias":
 # --- CONTROLE DA LOJA ---
 elif menu == "Controle Loja":
     st.title("🛍️ Status da Loja")
-    res = requests.get(f"{API_BASE_URL}/api/status")
-    aberto = res.json().get("loja_aberta", False)
+
+    try:
+        res = requests.get(f"{API_BASE_URL}/api/status")
+        res.raise_for_status()
+        data = res.json()
+        aberto = data.get("loja_aberta", False)
+    except Exception as e:
+        st.error("Erro ao verificar status da loja.")
+        st.stop()
+
     st.write(f"Loja está: **{'Aberta' if aberto else 'Fechada'}**")
 
     if st.button("Abrir Loja" if not aberto else "Fechar Loja"):
