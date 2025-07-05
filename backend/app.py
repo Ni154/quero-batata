@@ -64,7 +64,8 @@ def categoria_update(id):
 @app.route('/api/pedido', methods=['POST'])
 def novo_pedido():
     res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
-    loja_aberta = res.data and res.data['valor'] is True
+    loja_aberta = res.data and res.data['valor'] == 'true'  # ✅ Aqui está a correção
+
     if not loja_aberta:
         return jsonify({"error": "Loja fechada, não é possível fazer pedidos agora."}), 403
 
@@ -80,7 +81,7 @@ def novo_pedido():
         "criado_em": datetime.now().isoformat()
     }
     resultado = supabase.table("pedidos").insert(pedido).execute()
-    # Cheque resultado e log
+
     if resultado.error:
         return jsonify({"error": "Erro ao inserir pedido: " + str(resultado.error)}), 500
 
