@@ -61,22 +61,10 @@ def categoria_update(id):
         return jsonify({"message": "Categoria excluída"})
 
 # --- Pedidos ---
-@app.route('/api/pedidos', methods=['GET'])
-def listar_pedidos():
-    res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
-    return jsonify(res.data)
-
-@app.route('/api/pedidos/<int:id>', methods=['PUT'])
-def atualizar_pedido(id):
-    data = request.json
-    supabase.table("pedidos").update(data).eq("id", id).execute()
-    return jsonify({"message": "Pedido atualizado"})
-
 @app.route('/api/pedido', methods=['POST'])
 def novo_pedido():
-    # Verifica se a loja está aberta antes de aceitar pedido
     res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
-    loja_aberta = res.data and res.data['valor'] == 'true'
+    loja_aberta = res.data and res.data['valor'] is True
     if not loja_aberta:
         return jsonify({"error": "Loja fechada, não é possível fazer pedidos agora."}), 403
 
@@ -91,7 +79,11 @@ def novo_pedido():
         "status": "Recebido",
         "criado_em": datetime.now().isoformat()
     }
-    supabase.table("pedidos").insert(pedido).execute()
+    resultado = supabase.table("pedidos").insert(pedido).execute()
+    # Cheque resultado e log
+    if resultado.error:
+        return jsonify({"error": "Erro ao inserir pedido: " + str(resultado.error)}), 500
+
     return jsonify({"message": "Pedido recebido"})
 
 # --- Upload de imagem para produtos ---
