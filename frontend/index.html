@@ -215,46 +215,44 @@
     let produtos = [];
     let carrinho = [];
 
-    // Carregar categorias da API e montar abas
-    async function carregarCategorias() {
+    // Carregar categorias e produtos, garantindo a ordem para mostrar produtos da categoria ativa
+    async function carregarDados() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/categorias`);
-        categorias = await res.json();
-        const divCategorias = document.getElementById("categorias");
-        divCategorias.innerHTML = "";
-        categorias.forEach((cat, i) => {
-          const div = document.createElement("div");
-          div.className = "categoria" + (i === 0 ? " ativa" : "");
-          div.textContent = cat.nome;
-          div.dataset.id = cat.id;
-          div.onclick = (e) => mostrarCategoria(cat.id, e);
-          divCategorias.appendChild(div);
-        });
-        // Mostrar produtos da primeira categoria por padrão
+        const [resCat, resProd] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/categorias`),
+          fetch(`${API_BASE_URL}/api/produtos`)
+        ]);
+        categorias = await resCat.json();
+        produtos = await resProd.json();
+
+        montarCategorias();
+        // Selecionar a primeira categoria por padrão
         if (categorias.length > 0) {
-          mostrarCategoria(categorias[0].id, { target: divCategorias.children[0] });
+          mostrarCategoria(categorias[0].id);
         }
       } catch (err) {
-        alert("Erro ao carregar categorias");
+        alert("Erro ao carregar dados");
         console.error(err);
       }
     }
 
-    // Carregar produtos da API
-    async function carregarProdutos() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/produtos`);
-        produtos = await res.json();
-      } catch (err) {
-        alert("Erro ao carregar produtos");
-        console.error(err);
-      }
+    function montarCategorias() {
+      const divCategorias = document.getElementById("categorias");
+      divCategorias.innerHTML = "";
+      categorias.forEach((cat, i) => {
+        const div = document.createElement("div");
+        div.className = "categoria";
+        if (i === 0) div.classList.add("ativa");
+        div.textContent = cat.nome;
+        div.dataset.id = cat.id;
+        div.onclick = (e) => mostrarCategoria(cat.id, e);
+        divCategorias.appendChild(div);
+      });
     }
 
-    // Mostrar produtos da categoria selecionada
     function mostrarCategoria(catId, event) {
       document.querySelectorAll(".categoria").forEach(el => el.classList.remove("ativa"));
-      if(event?.target) event.target.classList.add("ativa");
+      if (event?.target) event.target.classList.add("ativa");
 
       const div = document.getElementById("produtos");
       const categoria = categorias.find(c => c.id === catId);
@@ -354,7 +352,7 @@
         atualizarCarrinho();
         fecharModalPedido();
 
-        // Dispara evento para notificação no painel (se tiver implementado)
+        // Dispara evento para notificação no painel (se implementado)
         const event = new CustomEvent('novoPedido', { detail: data });
         window.dispatchEvent(event);
       })
@@ -365,10 +363,7 @@
     }
 
     // Inicialização
-    (async () => {
-      await carregarCategorias();
-      await carregarProdutos();
-    })();
+    carregarDados();
   </script>
 </body>
 </html>
