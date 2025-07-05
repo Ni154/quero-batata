@@ -106,16 +106,19 @@ def upload_imagem():
 # --- Status da loja ---
 @app.route('/api/status', methods=['GET', 'POST'])
 def status_loja():
-    if request.method == 'GET':
-        res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
-        valor = res.data['valentia'] if res.data else 'false'
-        return jsonify({"loja_aberta": valor == 'true'})
+    try:
+        if request.method == 'GET':
+            res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+            valor = res.data['valor'] if res.data else 'false'
+            return jsonify({"loja_aberta": valor == 'true'})
 
-    if request.method == 'POST':
-        data = request.json
-        valor_str = "true" if data.get("loja_aberta") else "false"
-        supabase.table("config").upsert({"chave": "loja_aberta", "valentia": valor_str}).execute()
-        return jsonify({"message": "Status atualizado"})
+        if request.method == 'POST':
+            data = request.json
+            valor_str = "true" if data.get("loja_aberta") else "false"
+            supabase.table("config").upsert({"chave": "loja_aberta", "valor": valor_str}).execute()
+            return jsonify({"message": "Status atualizado"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
