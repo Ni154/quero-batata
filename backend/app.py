@@ -61,14 +61,24 @@ def categoria_update(id):
         return jsonify({"message": "Categoria excluída"})
 
 # --- Pedidos ---
+@app.route('/api/pedidos', methods=['GET'])
+def listar_pedidos():
+    res = supabase.table("pedidos").select("*").order("criado_em", desc=True).execute()
+    return jsonify(res.data)
+
+@app.route('/api/pedidos/<int:id>', methods=['PUT'])
+def atualizar_pedido(id):
+    data = request.json
+    supabase.table("pedidos").update(data).eq("id", id).execute()
+    return jsonify({"message": "Pedido atualizado"})
+
 @app.route('/api/pedido', methods=['POST'])
 def novo_pedido():
-    # Verifica status da loja antes de aceitar pedido
-    status_res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
-    loja_aberta = status_res.data['valor'] == 'true' if status_res.data else False
-
+    # Verifica se a loja está aberta antes de aceitar pedido
+    res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+    loja_aberta = res.data and res.data['valor'] == 'true'
     if not loja_aberta:
-        return jsonify({"error": "A loja está fechada no momento. Não é possível fazer pedidos."}), 403
+        return jsonify({"error": "Loja fechada, não é possível fazer pedidos agora."}), 403
 
     data = request.json
     pedido = {
@@ -91,7 +101,10 @@ def upload_imagem():
         return jsonify({"error": "Arquivo não enviado"}), 400
     file = request.files['file']
     nome_arquivo = f"produtos/{uuid.uuid4().hex}_{file.filename}"
-    supabase.storage.from_('produtos').upload(nome_arquivo, file)
+    try:
+        supabase.storage.from_('produtos').upload(nome_arquivo, file)
+    except Exception as e:
+        return jsonify({"error": "Erro no upload: " + str(e)}), 500
     url_publica = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
     return jsonify({"url": url_publica})
 
