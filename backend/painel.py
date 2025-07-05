@@ -1,100 +1,105 @@
-# backend/painel.py
-import streamlit as st
-import requests
-import json
+# backend/app.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from supabase import create_client
+import os
+import uuid
+from datetime import datetime
 
-API_BASE_URL = "https://quero-batata-production.up.railway.app"
+app = Flask(__name__)
+CORS(app)
 
-st.set_page_config(page_title="Painel Quero Batata", layout="wide")
-
-# Login simples (exemplo sem segurança avançada)
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-
-if not st.session_state.logado:
-    st.title("🔐 Login")
-    user = st.text_input("Usuário")
-    pwd = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        # Aqui você pode fazer uma chamada para backend verificar login
-        if user == "admin" and pwd == "admin":  # Troque por autenticação real
-            st.session_state.logado = True
-            st.experimental_rerun()
-        else:
-            st.error("Usuário ou senha incorretos")
-    st.stop()
-
-menu = st.sidebar.radio("Menu", ["Pedidos", "Produtos", "Categorias", "Controle Loja", "Dashboard"])
-
-# --- Pedidos ---
-if menu == "Pedidos":
-    st.title("Pedidos")
-    res = requests.get(f"{API_BASE_URL}/api/pedidos")  # Você pode precisar criar essa rota GET no backend
-    pedidos = res.json() if res.status_code == 200 else []
-    for p in pedidos:
-        st.write(f"Cliente: {p['nome_cliente']} | Telefone: {p['telefone']}")
-        st.write(f"Endereço: {p['endereco']}")
-        st.write(f"Total: R$ {p['total']}")
-        st.write(f"Status: {p['status']}")
-        st.write("---")
+SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
+SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- Produtos ---
-elif menu == "Produtos":
-    st.title("Produtos")
-    res = requests.get(f"{API_BASE_URL}/api/produtos")
-    produtos = res.json() if res.status_code == 200 else []
-    nomes = [p['nome'] for p in produtos]
-    with st.form("form_produtos"):
-        nome = st.text_input("Nome")
-        preco = st.number_input("Preço", min_value=0.0, step=0.5)
-        categoria_id = st.number_input("ID Categoria", min_value=1)
-        submitted = st.form_submit_button("Adicionar Produto")
-        if submitted:
-            novo = {"nome": nome, "preco": preco, "categoria_id": categoria_id}
-            r = requests.post(f"{API_BASE_URL}/api/produtos", json=novo)
-            if r.status_code == 201:
-                st.success("Produto criado!")
-            else:
-                st.error("Erro ao criar produto.")
+@app.route('/api/produtos', methods=['GET', 'POST'])
+def produtos():
+    if request.method == 'GET':
+        res = supabase.table("produtos").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        novo = {
+            "nome": data.get("nome"),
+            "preco": data.get("preco"),
+            "categoria_id": data.get("categoria_id"),
+            "imagem_url": data.get("imagem_url", ""),
+            "disponivel": True
+        }
+        supabase.table("produtos").insert(novo).execute()
+        return jsonify({"message": "Produto criado"}), 201
 
-    for p in produtos:
-        st.write(f"{p['id']} - {p['nome']} - R$ {p['preco']} (Cat: {p['categoria_id']})")
+@app.route('/api/produtos/<int:id>', methods=['PUT', 'DELETE'])
+def produto_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("produtos").update(data).eq("id", id).execute()
+        return jsonify({"message": "Produto atualizado"})
+    if request.method == 'DELETE':
+        supabase.table("produtos").delete().eq("id", id).execute()
+        return jsonify({"message": "Produto excluído"})
 
 # --- Categorias ---
-elif menu == "Categorias":
-    st.title("Categorias")
-    res = requests.get(f"{API_BASE_URL}/api/categorias")
-    categorias = res.json() if res.status_code == 200 else []
-    with st.form("form_categorias"):
-        nome = st.text_input("Nome Categoria")
-        submitted = st.form_submit_button("Adicionar Categoria")
-        if submitted:
-            r = requests.post(f"{API_BASE_URL}/api/categorias", json={"nome": nome})
-            if r.status_code == 201:
-                st.success("Categoria criada!")
-            else:
-                st.error("Erro ao criar categoria.")
+@app.route('/api/categorias', methods=['GET', 'POST'])
+def categorias():
+    if request.method == 'GET':
+        res = supabase.table("categorias").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        supabase.table("categorias").insert({"nome": data.get("nome")}).execute()
+        return jsonify({"message": "Categoria criada"}), 201
 
-    for c in categorias:
-        st.write(f"{c['id']} - {c['nome']}")
+@app.route('/api/categorias/<int:id>', methods=['PUT', 'DELETE'])
+def categoria_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("categorias").update(data).eq("id", id).execute()
+        return jsonify({"message": "Categoria atualizada"})
+    if request.method == 'DELETE':
+        supabase.table("categorias").delete().eq("id", id).execute()
+        return jsonify({"message": "Categoria excluída"})
 
-# --- Controle Loja ---
-elif menu == "Controle Loja":
-    st.title("Controle da Loja")
-    res = requests.get(f"{API_BASE_URL}/api/status")
-    aberto = res.json().get("loja_aberta", False)
-    st.write(f"Loja está {'Aberta' if aberto else 'Fechada'}")
+# --- Pedidos ---
+@app.route('/api/pedido', methods=['POST'])
+def novo_pedido():
+    data = request.json
+    pedido = {
+        "nome_cliente": data.get("nome"),
+        "telefone": data.get("telefone"),
+        "endereco": data.get("endereco"),
+        "produtos": data.get("produtos"),
+        "taxa_entrega": data.get("taxa_entrega"),
+        "total": data.get("total"),
+        "status": "Recebido",
+        "criado_em": datetime.now().isoformat()
+    }
+    supabase.table("pedidos").insert(pedido).execute()
+    return jsonify({"message": "Pedido recebido"})
 
-    if st.button("Abrir Loja" if not aberto else "Fechar Loja"):
-        r = requests.post(f"{API_BASE_URL}/api/status", json={"loja_aberta": not aberto})
-        if r.status_code == 200:
-            st.experimental_rerun()
-        else:
-            st.error("Erro ao alterar status")
+# --- Upload de imagem para produtos ---
+@app.route('/api/upload', methods=['POST'])
+def upload_imagem():
+    if 'file' not in request.files:
+        return jsonify({"error": "Arquivo não enviado"}), 400
+    file = request.files['file']
+    nome_arquivo = f"produtos/{uuid.uuid4().hex}_{file.filename}"
+    supabase.storage.from_('produtos').upload(nome_arquivo, file)
+    url_publica = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
+    return jsonify({"url": url_publica})
 
-# --- Dashboard ---
-elif menu == "Dashboard":
-    st.title("Dashboard")
-    # Aqui você pode montar gráficos baseados em pedidos, produtos, etc.
-    st.write("Dashboard a implementar...")
+# --- Status da loja ---
+@app.route('/api/status', methods=['GET', 'POST'])
+def status_loja():
+    if request.method == 'GET':
+        res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+        return jsonify({"loja_aberta": res.data['valor'] == 'true' if res.data else False})
+    if request.method == 'POST':
+        data = request.json
+        supabase.table("config").upsert({"chave": "loja_aberta", "valor": "true" if data.get("loja_aberta") else "false"}).execute()
+        return jsonify({"message": "Status atualizado"})
 
+if __name__ == '__main__':
+    app.run(debug=True)
