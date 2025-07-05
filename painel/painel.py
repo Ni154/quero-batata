@@ -18,7 +18,7 @@ if not st.session_state.logado:
     if st.button("Entrar"):
         if user == "admin" and pwd == "admin":
             st.session_state.logado = True
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Usuário ou senha incorretos")
     st.stop()
@@ -130,7 +130,7 @@ elif menu == "Categorias":
         with col2:
             if st.button("Excluir", key=f"delcat_{c['id']}"):
                 requests.delete(f"{API_BASE_URL}/api/categorias/{c['id']}")
-                st.experimental_rerun()
+                st.rerun()
 
 # --- CONTROLE DA LOJA ---
 elif menu == "Controle Loja":
