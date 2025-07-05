@@ -12,7 +12,6 @@ async function carregarCardapio() {
   const divCategorias = document.querySelector('.categorias');
   const divProdutos = document.getElementById('produtos');
 
-  // Limpar áreas
   divCategorias.innerHTML = '';
   divProdutos.innerHTML = '';
 
@@ -24,7 +23,6 @@ async function carregarCardapio() {
     divCategorias.appendChild(catDiv);
   });
 
-  // Mostrar produtos da primeira categoria por padrão
   if (categorias.length > 0) {
     mostrarCategoria(categorias[0].id, produtos);
   }
@@ -38,8 +36,8 @@ function mostrarCategoria(catId, produtos, event) {
   div.innerHTML = `<div class="secao"><h2>Batatas com Categoria ${catId}</h2></div>`;
 
   produtos.filter(p => p.categoria_id === catId).forEach(p => {
-    const card = document.createElement("div");
-    card.className = "card";
+    const card = document.createElement('div');
+    card.className = 'card';
     card.innerHTML = `
       <img src="${p.img_url || 'https://via.placeholder.com/100x80'}" alt="${p.nome}" />
       <div class="card-info">
@@ -79,9 +77,26 @@ function atualizarCarrinho() {
   document.getElementById("total").innerText = total.toFixed(2);
 }
 
-function abrirModalPedido() {
+async function verificarStatusLoja() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/status`);
+    if (!res.ok) throw new Error('Erro ao consultar status da loja');
+    const data = await res.json();
+    return data.loja_aberta;
+  } catch (error) {
+    console.error("Erro ao verificar status da loja:", error);
+    return false;
+  }
+}
+
+async function abrirModalPedido() {
+  const lojaAberta = await verificarStatusLoja();
+  if (!lojaAberta) {
+    alert("No momento, a loja está fechada. Não é possível fazer pedidos.");
+    return;
+  }
   if (carrinho.length === 0) {
-    alert("Adicione itens ao carrinho.");
+    alert("Adicione itens ao carrinho antes de finalizar o pedido.");
     return;
   }
   const taxa_entrega = 5.00;
@@ -95,13 +110,26 @@ function fecharModalPedido() {
   document.getElementById("modalPedido").style.display = "none";
 }
 
-function enviarPedido() {
+async function enviarPedido() {
+  const lojaAberta = await verificarStatusLoja();
+  if (!lojaAberta) {
+    alert("A loja fechou antes de concluir seu pedido. Tente novamente mais tarde.");
+    fecharModalPedido();
+    return;
+  }
+
   const nome = document.getElementById("nome").value.trim();
   const telefone = document.getElementById("telefone").value.trim();
   const endereco = document.getElementById("endereco").value.trim();
+  const formaPagamento = document.getElementById("formaPagamento").value;
 
   if (!nome || !telefone || !endereco) {
-    alert("Preencha todos os campos!");
+    alert("Por favor, preencha todos os campos.");
+    return;
+  }
+
+  if (!formaPagamento) {
+    alert("Por favor, selecione a forma de pagamento.");
     return;
   }
 
@@ -118,28 +146,24 @@ function enviarPedido() {
       endereco,
       produtos: carrinho,
       taxa_entrega,
-      total
+      total,
+      forma_pagamento: formaPagamento
     })
   })
-  .then(res => {
-    if(!res.ok) throw new Error("Erro ao enviar pedido");
-    return res.json();
-  })
-  .then(data => {
-    alert("Pedido enviado com sucesso!");
-    carrinho = [];
-    atualizarCarrinho();
-    fecharModalPedido();
-
-    // Pode usar esse evento para notificação no painel, se implementado
-    const event = new CustomEvent('novoPedido', { detail: data });
-    window.dispatchEvent(event);
-  })
-  .catch(err => {
-    console.error(err);
-    alert("Erro ao enviar pedido.");
-  });
+    .then(res => {
+      if (!res.ok) throw new Error("Erro ao enviar pedido");
+      return res.json();
+    })
+    .then(() => {
+      alert("Pedido enviado com sucesso!");
+      carrinho = [];
+      atualizarCarrinho();
+      fecharModalPedido();
+    })
+    .catch(err => {
+      console.error(err);
+      alert("Erro ao enviar pedido.");
+    });
 }
 
-// Chama o carregamento do cardápio ao carregar a página
 window.onload = carregarCardapio;
