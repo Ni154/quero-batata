@@ -89,6 +89,13 @@ async function verificarStatusLoja() {
   }
 }
 
+async function exibirStatusLojaNaPagina() {
+  const status = await verificarStatusLoja();
+  const statusSpan = document.getElementById("statusLoja");
+  statusSpan.textContent = status ? "🟢 Loja Aberta" : "🔴 Loja Fechada";
+  statusSpan.style.color = status ? "green" : "red";
+}
+
 async function abrirModalPedido() {
   const lojaAberta = await verificarStatusLoja();
   if (!lojaAberta) {
@@ -166,4 +173,10 @@ async function enviarPedido() {
     });
 }
 
-window.onload = carregarCardapio;
+window.onload = async () => {
+  await carregarCardapio();
+  await exibirStatusLojaNaPagina();
+};
+
+// Atualiza o status da loja a cada 30 segundos automaticamente
+setInterval(exibirStatusLojaNaPagina, 30000);
