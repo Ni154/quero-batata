@@ -18,7 +18,7 @@ if not st.session_state.logado:
     if st.button("Entrar"):
         if user == "admin" and pwd == "admin":
             st.session_state.logado = True
-            st.rerun()
+            st.experimental_rerun()
         else:
             st.error("Usuário ou senha incorretos")
     st.stop()
@@ -80,7 +80,11 @@ elif menu == "Produtos":
                 buf.seek(0)
                 files = {"file": ("imagem.png", buf, "image/png")}
                 upload = requests.post(f"{API_BASE_URL}/api/upload", files=files)
-                imagem_url = upload.json().get("url", "")
+                if upload.status_code == 200:
+                    imagem_url = upload.json().get("url", "")
+                else:
+                    st.error("Erro no upload da imagem")
+                    imagem_url = ""
 
             novo = {
                 "nome": nome,
@@ -130,7 +134,7 @@ elif menu == "Categorias":
         with col2:
             if st.button("Excluir", key=f"delcat_{c['id']}"):
                 requests.delete(f"{API_BASE_URL}/api/categorias/{c['id']}")
-                st.rerun()
+                st.experimental_rerun()
 
 # --- CONTROLE DA LOJA ---
 elif menu == "Controle Loja":
