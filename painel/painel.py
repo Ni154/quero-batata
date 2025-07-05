@@ -1,154 +1,119 @@
-import streamlit as st
-import requests
-from PIL import Image
-import io
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from supabase import create_client
+import uuid
+from datetime import datetime
 
-API_BASE_URL = "https://quero-batata-production.up.railway.app"
+app = Flask(__name__)
+CORS(app)
 
-st.set_page_config(page_title="Painel Quero Batata", layout="wide")
+SUPABASE_URL = "https://jptsbutoikieipwnlbft.supabase.co"
+SUPABASE_KEY = "sb_secret_KTTNWWrjuuuPL3CQRdHo-Q_1lcYZfFt"
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Login simples
-if "logado" not in st.session_state:
-    st.session_state.logado = False
+# --- Produtos ---
+@app.route('/api/produtos', methods=['GET', 'POST'])
+def produtos():
+    if request.method == 'GET':
+        res = supabase.table("produtos").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        novo = {
+            "nome": data.get("nome"),
+            "preco": data.get("preco"),
+            "categoria_id": data.get("categoria_id"),
+            "imagem_url": data.get("imagem_url", ""),
+            "disponivel": True
+        }
+        supabase.table("produtos").insert(novo).execute()
+        return jsonify({"message": "Produto criado"}), 201
 
-if not st.session_state.logado:
-    st.title("🔐 Login")
-    user = st.text_input("Usuário")
-    pwd = st.text_input("Senha", type="password")
-    if st.button("Entrar"):
-        if user == "admin" and pwd == "admin":
-            st.session_state.logado = True
-            st.rerun()
-        else:
-            st.error("Usuário ou senha incorretos")
-    st.stop()
+@app.route('/api/produtos/<int:id>', methods=['PUT', 'DELETE'])
+def produto_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("produtos").update(data).eq("id", id).execute()
+        return jsonify({"message": "Produto atualizado"})
+    if request.method == 'DELETE':
+        supabase.table("produtos").delete().eq("id", id).execute()
+        return jsonify({"message": "Produto excluído"})
 
-menu = st.sidebar.radio("Menu", ["Pedidos", "Produtos", "Categorias", "Controle Loja", "Dashboard"])
+# --- Categorias ---
+@app.route('/api/categorias', methods=['GET', 'POST'])
+def categorias():
+    if request.method == 'GET':
+        res = supabase.table("categorias").select("*").execute()
+        return jsonify(res.data)
+    if request.method == 'POST':
+        data = request.json
+        supabase.table("categorias").insert({"nome": data.get("nome")}).execute()
+        return jsonify({"message": "Categoria criada"}), 201
 
-# --- PEDIDOS ---
-if menu == "Pedidos":
-    st.title("Pedidos")
-    res = requests.get(f"{API_BASE_URL}/api/pedidos")
-    pedidos = res.json() if res.status_code == 200 else []
+@app.route('/api/categorias/<int:id>', methods=['PUT', 'DELETE'])
+def categoria_update(id):
+    if request.method == 'PUT':
+        data = request.json
+        supabase.table("categorias").update(data).eq("id", id).execute()
+        return jsonify({"message": "Categoria atualizada"})
+    if request.method == 'DELETE':
+        supabase.table("categorias").delete().eq("id", id).execute()
+        return jsonify({"message": "Categoria excluída"})
 
-    novos = [p for p in pedidos if p.get("status") != "Finalizado"]
-    finalizados = [p for p in pedidos if p.get("status") == "Finalizado"]
+# --- Pedidos ---
+@app.route('/api/pedido', methods=['POST'])
+def novo_pedido():
+    res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+    loja_aberta = res.data and res.data['valor'] is True
+    if not loja_aberta:
+        return jsonify({"error": "Loja fechada, não é possível fazer pedidos agora."}), 403
 
-    st.subheader("🆕 Novos Pedidos")
-    for p in novos:
-        with st.expander(f"Pedido de {p.get('nome_cliente')} - R$ {p.get('total')}"):
-            st.write(f"📞 {p.get('telefone')}")
-            st.write(f"📍 {p.get('endereco')}")
-            st.write(f"🛍️ Produtos: {p.get('produtos')}")
-            st.write(f"💰 Total: R$ {p.get('total')} + Taxa: R$ {p.get('taxa_entrega')}")
-            st.write(f"🕒 Criado em: {p.get('criado_em')}")
-            if st.button("Marcar como Finalizado", key=f"finalizar_{p.get('id')}"):
-                requests.put(f"{API_BASE_URL}/api/pedidos/{p.get('id')}", json={"status": "Finalizado"})
-                st.experimental_rerun()
+    data = request.json
+    pedido = {
+        "nome_cliente": data.get("nome"),
+        "telefone": data.get("telefone"),
+        "endereco": data.get("endereco"),
+        "produtos": data.get("produtos"),
+        "taxa_entrega": data.get("taxa_entrega"),
+        "total": data.get("total"),
+        "status": "Recebido",
+        "criado_em": datetime.now().isoformat()
+    }
+    resultado = supabase.table("pedidos").insert(pedido).execute()
+    # Cheque resultado e log
+    if resultado.error:
+        return jsonify({"error": "Erro ao inserir pedido: " + str(resultado.error)}), 500
 
-    st.divider()
-    st.subheader("✅ Pedidos Finalizados")
-    for p in finalizados:
-        st.write(f"{p.get('nome_cliente')} - R$ {p.get('total')}")
+    return jsonify({"message": "Pedido recebido"})
 
-# --- PRODUTOS ---
-elif menu == "Produtos":
-    st.title("Produtos")
-    prod_res = requests.get(f"{API_BASE_URL}/api/produtos")
-    cat_res = requests.get(f"{API_BASE_URL}/api/categorias")
-    produtos = prod_res.json() if prod_res.status_code == 200 else []
-    categorias = cat_res.json() if cat_res.status_code == 200 else []
+# --- Upload de imagem para produtos ---
+@app.route('/api/upload', methods=['POST'])
+def upload_imagem():
+    if 'file' not in request.files:
+        return jsonify({"error": "Arquivo não enviado"}), 400
+    file = request.files['file']
+    nome_arquivo = f"produtos/{uuid.uuid4().hex}_{file.filename}"
+    try:
+        supabase.storage.from_('produtos').upload(nome_arquivo, file)
+    except Exception as e:
+        return jsonify({"error": "Erro no upload: " + str(e)}), 500
+    url_publica = supabase.storage.from_('produtos').get_public_url(nome_arquivo)
+    return jsonify({"url": url_publica})
 
-    cat_dict = {c["nome"]: c["id"] for c in categorias}
+# --- Status da loja ---
+@app.route('/api/status', methods=['GET', 'POST'])
+def status_loja():
+    if request.method == 'GET':
+        res = supabase.table("config").select("*").eq("chave", "loja_aberta").single().execute()
+        valor = res.data['valor'] if res.data else False
+        loja_aberta = str(valor).lower() == 'true'
+        return jsonify({"loja_aberta": loja_aberta})
 
-    with st.form("form_produto"):
-        nome = st.text_input("Nome")
-        preco = st.number_input("Preço", min_value=0.0, step=0.5)
-        categoria_nome = st.selectbox("Categoria", list(cat_dict.keys()))
-        imagem = st.file_uploader("Imagem do produto", type=["png", "jpg", "jpeg"])
-        submit = st.form_submit_button("Adicionar Produto")
+    if request.method == 'POST':
+        data = request.json
+        valor = "true" if data.get("loja_aberta") else "false"
+        supabase.table("config").upsert({"chave": "loja_aberta", "valor": valor}).execute()
+        return jsonify({"message": "Status atualizado"})
 
-        if submit:
-            categoria_id = cat_dict[categoria_nome]
-            imagem_url = ""
-
-            if imagem:
-                img = Image.open(imagem)
-                img = img.resize((300, 300))
-                buf = io.BytesIO()
-                img.save(buf, format="PNG")
-                buf.seek(0)
-                files = {"file": ("imagem.png", buf, "image/png")}
-                upload = requests.post(f"{API_BASE_URL}/api/upload", files=files)
-                if upload.status_code == 200:
-                    imagem_url = upload.json().get("url", "")
-
-            novo = {
-                "nome": nome,
-                "preco": preco,
-                "categoria_id": categoria_id,
-                "imagem_url": imagem_url
-            }
-            r = requests.post(f"{API_BASE_URL}/api/produtos", json=novo)
-            if r.status_code == 201:
-                st.success("Produto criado!")
-                st.rerun()
-            else:
-                st.error("Erro ao criar produto.")
-
-    st.subheader("📦 Produtos Cadastrados")
-    for p in produtos:
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(f"**{p.get('nome')}** - R$ {p.get('preco')} | Categoria ID: {p.get('categoria_id')}")
-        with col2:
-            if st.button("Excluir", key=f"delprod_{p.get('id')}"):
-                requests.delete(f"{API_BASE_URL}/api/produtos/{p.get('id')}")
-                st.rerun()
-
-# --- CATEGORIAS ---
-elif menu == "Categorias":
-    st.title("Categorias")
-    res = requests.get(f"{API_BASE_URL}/api/categorias")
-    categorias = res.json() if res.status_code == 200 else []
-
-    with st.form("form_cat"):
-        nome = st.text_input("Nome da Categoria")
-        submit = st.form_submit_button("Adicionar Categoria")
-        if submit:
-            r = requests.post(f"{API_BASE_URL}/api/categorias", json={"nome": nome})
-            if r.status_code == 201:
-                st.success("Categoria criada!")
-                st.rerun()
-            else:
-                st.error("Erro ao criar categoria.")
-
-    st.subheader("📂 Categorias Cadastradas")
-    for c in categorias:
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(f"{c.get('id')} - {c.get('nome')}")
-        with col2:
-            if st.button("Excluir", key=f"delcat_{c.get('id')}"):
-                requests.delete(f"{API_BASE_URL}/api/categorias/{c.get('id')}")
-                st.rerun()
-
-# --- CONTROLE DA LOJA ---
-elif menu == "Controle Loja":
-    st.title("🛍️ Status da Loja")
-    res = requests.get(f"{API_BASE_URL}/api/status")
-    aberto = res.json().get("loja_aberta", False)
-    st.write(f"Loja está: **{'Aberta' if aberto else 'Fechada'}**")
-
-    if st.button("Abrir Loja" if not aberto else "Fechar Loja"):
-        r = requests.post(f"{API_BASE_URL}/api/status", json={"loja_aberta": not aberto})
-        if r.status_code == 200:
-            st.success("Status alterado")
-            st.rerun()
-        else:
-            st.error("Erro ao alterar status")
-
-# --- DASHBOARD ---
-elif menu == "Dashboard":
-    st.title("📊 Dashboard")
-    st.write("Em breve: gráficos de produtos mais vendidos, clientes frequentes e filtro por período.")
+if __name__ == '__main__':
+    app.run(debug=True)
