@@ -92,7 +92,7 @@ elif menu == "Produtos":
             r = requests.post(f"{API_BASE_URL}/api/produtos", json=novo)
             if r.status_code == 201:
                 st.success("Produto criado!")
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error("Erro ao criar produto.")
 
@@ -104,7 +104,7 @@ elif menu == "Produtos":
         with col2:
             if st.button("Excluir", key=f"delprod_{p.get('id')}"):
                 requests.delete(f"{API_BASE_URL}/api/produtos/{p.get('id')}")
-                st.experimental_rerun()
+                st.rerun()
 
 # --- CATEGORIAS ---
 elif menu == "Categorias":
@@ -131,7 +131,7 @@ elif menu == "Categorias":
         with col2:
             if st.button("Excluir", key=f"delcat_{c.get('id')}"):
                 requests.delete(f"{API_BASE_URL}/api/categorias/{c.get('id')}")
-                st.experimental_rerun()
+                st.rerun()
 
 # --- CONTROLE DA LOJA ---
 elif menu == "Controle Loja":
