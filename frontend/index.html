@@ -23,6 +23,12 @@
       font-weight: bold;
       cursor: pointer;
     }
+    #statusLoja {
+      text-align: center;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 10px;
+    }
     .restaurante-info {
       background: white;
       padding: 16px;
@@ -184,6 +190,9 @@
     <a class="login" href="https://quero-batata.streamlit.app/" target="_blank" rel="noopener noreferrer">ENTRAR</a>
   </header>
 
+  <!-- ✅ Status da loja -->
+  <div id="statusLoja">Verificando status da loja...</div>
+
   <div class="restaurante-info">
     <h3>🥔 Aberto até 23:59</h3>
     <p>Entrega: R$ 5,00 • Mínimo: R$ 0,00</p>
@@ -226,6 +235,28 @@
       <button onclick="enviarPedido()">Enviar Pedido</button>
     </div>
   </div>
+
+  <!-- ✅ Script para status da loja -->
+  <script>
+    const API_BASE_URL = "https://quero-batata-production.up.railway.app";
+
+    async function verificarStatusLoja() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/status`);
+        const data = await res.json();
+        const status = data.loja_aberta;
+        const statusEl = document.getElementById("statusLoja");
+        statusEl.textContent = status ? "🟢 Loja Aberta" : "🔴 Loja Fechada";
+        statusEl.style.color = status ? "green" : "red";
+      } catch (err) {
+        document.getElementById("statusLoja").textContent = "Erro ao verificar status da loja";
+        document.getElementById("statusLoja").style.color = "gray";
+      }
+    }
+
+    verificarStatusLoja();
+    setInterval(verificarStatusLoja, 30000); // Atualiza a cada 30s
+  </script>
 
   <script src="script.js"></script>
 </body>
