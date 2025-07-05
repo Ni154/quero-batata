@@ -44,7 +44,7 @@ if menu == "Pedidos":
             st.write(f"🕒 Criado em: {p.get('criado_em')}")
             if st.button("Marcar como Finalizado", key=f"finalizar_{p.get('id')}"):
                 requests.put(f"{API_BASE_URL}/api/pedidos/{p.get('id')}", json={"status": "Finalizado"})
-                st.experimental_rerun()
+                st.rerun()
 
     st.divider()
     st.subheader("✅ Pedidos Finalizados")
