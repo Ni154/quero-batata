@@ -128,6 +128,49 @@
         right: 5%;
       }
     }
+    #modalPedido {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    #modalPedido .modal-conteudo {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+      box-sizing: border-box;
+    }
+    #modalPedido input, #modalPedido textarea {
+      width: 100%;
+      margin-top: 6px;
+      margin-bottom: 12px;
+      padding: 8px;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      resize: vertical;
+    }
+    #modalPedido button {
+      background: #ff9900;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: bold;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+    #modalPedido button:hover {
+      background: #e07b00;
+    }
   </style>
 </head>
 <body>
@@ -145,54 +188,194 @@
 
   <div class="produtos" id="produtos"></div>
 
+  <div class="carrinho">
+    <h3>Carrinho</h3>
+    <div id="carrinho-itens">Seu carrinho está vazio.</div>
+    <strong>Total: R$ <span id="total">0,00</span></strong><br/>
+    <button onclick="abrirModalPedido()">Finalizar Pedido</button>
+  </div>
+
+  <!-- Modal Finalizar Pedido -->
+  <div id="modalPedido">
+    <div class="modal-conteudo">
+      <h3>Finalizar Pedido</h3>
+      <p><strong>Total com entrega: R$ <span id="modalTotal">0,00</span></strong></p>
+      <label>Nome:<br><input type="text" id="nome" /></label>
+      <label>Telefone:<br><input type="text" id="telefone" /></label>
+      <label>Endereço:<br><textarea id="endereco" rows="3"></textarea></label>
+      <button onclick="enviarPedido()">Enviar Pedido</button>
+    </div>
+  </div>
+
   <script>
     const API_BASE_URL = "https://quero-batata-production.up.railway.app";
+
     let categorias = [];
     let produtos = [];
+    let carrinho = [];
 
-    async function carregarCategorias() {
-      const res = await fetch(`${API_BASE_URL}/api/categorias`);
-      categorias = await res.json();
-      const div = document.getElementById("categorias");
-      div.innerHTML = "";
-      categorias.forEach((c, i) => {
-        const el = document.createElement("div");
-        el.className = "categoria" + (i === 0 ? " ativa" : "");
-        el.textContent = c.nome;
-        el.onclick = () => mostrarProdutos(c.id, el);
-        div.appendChild(el);
+    // Carrega categorias e produtos e inicializa
+    async function inicializar() {
+      try {
+        // Buscar categorias
+        const resCat = await fetch(`${API_BASE_URL}/api/categorias`);
+        categorias = await resCat.json();
+
+        // Buscar produtos
+        const resProd = await fetch(`${API_BASE_URL}/api/produtos`);
+        produtos = await resProd.json();
+
+        montarCategorias();
+      } catch (err) {
+        alert("Erro ao carregar dados do cardápio.");
+        console.error(err);
+      }
+    }
+
+    // Montar as abas de categorias
+    function montarCategorias() {
+      const divCategorias = document.getElementById("categorias");
+      divCategorias.innerHTML = "";
+      categorias.forEach((cat, i) => {
+        const div = document.createElement("div");
+        div.className = "categoria" + (i === 0 ? " ativa" : "");
+        div.textContent = cat.nome;
+        div.dataset.id = cat.id;
+        div.onclick = () => selecionarCategoria(cat.id, div);
+        divCategorias.appendChild(div);
       });
+
+      // Exibe produtos da primeira categoria ao iniciar
+      if (categorias.length > 0) {
+        selecionarCategoria(categorias[0].id, divCategorias.children[0]);
+      }
     }
 
-    async function carregarProdutos() {
-      const res = await fetch(`${API_BASE_URL}/api/produtos`);
-      produtos = await res.json();
-      if (categorias.length > 0) mostrarProdutos(categorias[0].id);
+    // Seleciona categoria, mostra produtos e ativa botão
+    function selecionarCategoria(catId, elClicado) {
+      document.querySelectorAll(".categoria").forEach(el => el.classList.remove("ativa"));
+      if(elClicado) elClicado.classList.add("ativa");
+
+      mostrarProdutos(catId);
     }
 
-    function mostrarProdutos(catId, elemento = null) {
-      document.querySelectorAll(".categoria").forEach(c => c.classList.remove("ativa"));
-      if (elemento) elemento.classList.add("ativa");
+    // Mostrar produtos da categoria selecionada
+    function mostrarProdutos(catId) {
+      const div = document.getElementById("produtos");
+      const categoria = categorias.find(c => c.id === catId);
+      div.innerHTML = `<div class="secao"><h2>Batatas com ${categoria ? categoria.nome : ""}</h2></div>`;
 
-      const area = document.getElementById("produtos");
-      area.innerHTML = "";
-      const lista = produtos.filter(p => p.categoria_id === catId);
+      const prodsFiltrados = produtos.filter(p => p.categoria_id === catId);
+      if (prodsFiltrados.length === 0) {
+        div.innerHTML += "<p>Nenhum produto nesta categoria.</p>";
+        return;
+      }
 
-      lista.forEach(p => {
+      prodsFiltrados.forEach(p => {
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML = `
           <img src="${p.imagem_url || 'https://via.placeholder.com/100x80?text=Sem+Imagem'}" alt="${p.nome}" />
           <div class="card-info">
             <h3>${p.nome}</h3>
+            <p>${p.descricao || ''}</p>
             <div class="preco">R$ ${p.preco.toFixed(2)}</div>
             <button onclick="adicionarCarrinho('${p.nome}', ${p.preco})">Adicionar</button>
           </div>`;
-        area.appendChild(card);
+        div.appendChild(card);
       });
     }
 
-    carregarCategorias().then(carregarProdutos);
+    // Adicionar produto no carrinho
+    function adicionarCarrinho(nome, preco) {
+      const item = carrinho.find(i => i.nome === nome);
+      if(item) {
+        item.qtd++;
+      } else {
+        carrinho.push({ nome, preco, qtd: 1 });
+      }
+      atualizarCarrinho();
+    }
+
+    // Atualizar visual do carrinho e total
+    function atualizarCarrinho() {
+      const div = document.getElementById("carrinho-itens");
+      if (carrinho.length === 0) {
+        div.innerHTML = "Seu carrinho está vazio.";
+        document.getElementById("total").innerText = "0,00";
+        return;
+      }
+      let html = "<ul>";
+      let total = 0;
+      carrinho.forEach(item => {
+        html += `<li>${item.nome} x ${item.qtd} = R$ ${(item.preco * item.qtd).toFixed(2)}</li>`;
+        total += item.preco * item.qtd;
+      });
+      html += "</ul>";
+      div.innerHTML = html;
+      document.getElementById("total").innerText = total.toFixed(2);
+    }
+
+    // Abrir modal para finalizar pedido
+    function abrirModalPedido() {
+      if (carrinho.length === 0) {
+        alert("Adicione itens ao carrinho antes de finalizar o pedido.");
+        return;
+      }
+      const taxaEntrega = 5.00;
+      const subtotal = carrinho.reduce((acc, i) => acc + i.preco * i.qtd, 0);
+      const total = subtotal + taxaEntrega;
+
+      document.getElementById("modalTotal").innerText = total.toFixed(2);
+      document.getElementById("modalPedido").style.display = "flex";
+    }
+
+    // Fechar modal pedido
+    function fecharModalPedido() {
+      document.getElementById("modalPedido").style.display = "none";
+    }
+
+    // Enviar pedido para backend
+    function enviarPedido() {
+      const nome = document.getElementById("nome").value.trim();
+      const telefone = document.getElementById("telefone").value.trim();
+      const endereco = document.getElementById("endereco").value.trim();
+
+      if (!nome || !telefone || !endereco) {
+        alert("Por favor, preencha todos os campos.");
+        return;
+      }
+
+      const taxaEntrega = 5.00;
+      const subtotal = carrinho.reduce((acc, i) => acc + i.preco * i.qtd, 0);
+      const total = subtotal + taxaEntrega;
+
+      fetch(`${API_BASE_URL}/api/pedido`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome,
+          telefone,
+          endereco,
+          produtos: carrinho,
+          taxa_entrega: taxaEntrega,
+          total
+        })
+      })
+      .then(res => res.json())
+      .then(() => {
+        alert("Pedido enviado com sucesso!");
+        carrinho = [];
+        atualizarCarrinho();
+        fecharModalPedido();
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Erro ao enviar pedido.");
+      });
+    }
+
+    window.onload = inicializar;
   </script>
 </body>
 </html>
